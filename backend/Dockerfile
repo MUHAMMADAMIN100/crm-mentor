@@ -19,12 +19,12 @@ WORKDIR /app
 RUN apk add --no-cache openssl
 
 COPY package*.json ./
+COPY prisma ./prisma
 RUN npm install --omit=dev --no-audit --no-fund
 
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/dist ./dist
-COPY prisma ./prisma
 
 ENV NODE_ENV=production
 ENV PORT=3000
