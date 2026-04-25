@@ -1,5 +1,6 @@
-import { PrismaClient } from '@prisma/client';
-import * as bcrypt from 'bcryptjs';
+/* eslint-disable */
+const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcryptjs');
 
 const prisma = new PrismaClient();
 
@@ -8,7 +9,7 @@ async function main() {
   const teacherPwd = await bcrypt.hash('teacher123', 10);
   const studentPwd = await bcrypt.hash('student123', 10);
 
-  const admin = await prisma.user.upsert({
+  await prisma.user.upsert({
     where: { login: 'admin' },
     update: {},
     create: {
@@ -70,7 +71,6 @@ async function main() {
     include: { studentProfile: true },
   });
 
-  // Demo course (idempotent: only create if teacher has no course yet)
   const existingCourse = await prisma.course.findFirst({ where: { teacherId: teacher.id } });
   const course = existingCourse || (await prisma.course.create({
     data: {
@@ -114,17 +114,9 @@ async function main() {
     });
   }
 
-  console.log('Seed OK:');
-  console.log('  admin   / admin123');
-  console.log('  teacher / teacher123');
-  console.log('  student / student123');
+  console.log('Seed OK: admin/admin123, teacher/teacher123, student/student123');
 }
 
 main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .catch((e) => { console.error(e); process.exit(1); })
+  .finally(async () => { await prisma.$disconnect(); });
