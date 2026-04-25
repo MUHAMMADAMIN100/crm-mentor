@@ -1,0 +1,92 @@
+import { useEffect, useState } from 'react';
+import { Shell } from '../../components/Shell';
+import { api } from '../../api';
+import { TreeView } from '../../components/Tree';
+
+export function TeacherHome() {
+  const [data, setData] = useState<any>(null);
+  const [note, setNote] = useState('');
+  const [savedAt, setSavedAt] = useState('');
+
+  useEffect(() => {
+    api.get('/teacher/dashboard').then((r) => {
+      setData(r.data);
+      setNote(r.data.note?.body || '');
+    });
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (!data) return;
+      api.put('/notes', { body: note }).then(() => setSavedAt(new Date().toLocaleTimeString('ru-RU')));
+    }, 700);
+    return () => clearTimeout(t);
+  }, [note]);
+
+  return (
+    <Shell title="Главное">
+      <div className="cards-grid">
+        <div className="card">
+          <h3>Расписание на сегодня</h3>
+          {data?.todayLessons?.length ? data.todayLessons.map((l: any) => (
+            <div key={l.id} className="list-item">
+              <div>
+                <div style={{ fontWeight: 500 }}>{new Date(l.startAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</div>
+                <div className="muted" style={{ fontSize: 12 }}>{l.type === 'INDIVIDUAL' ? 'Индивидуальный' : 'Групповой'} · {l.durationMin} мин</div>
+              </div>
+              <div className={`badge badge-${badgeForStatus(l.status)}`}>{statusLabel(l.status)}</div>
+            </div>
+          )) : <div className="empty">На сегодня уроков нет</div>}
+        </div>
+
+        <div className="card">
+          <h3>Заметки</h3>
+          <textarea
+            className="textarea"
+            maxLength={1000}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Ваши заметки сохраняются автоматически…"
+            style={{ minHeight: 130 }}
+          />
+          <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+            {note.length}/1000 · {savedAt && `сохранено в ${savedAt}`}
+          </div>
+        </div>
+
+        <div className="card" style={{ gridColumn: 'span 2' }}>
+          <h3>Уведомления</h3>
+          <div className="list">
+            {(data?.notifications || []).slice(0, 8).map((n: any) => (
+              <div key={n.id} className={`notif-item ${n.read ? '' : 'unread'}`}>
+                <div style={{ fontWeight: 500 }}>{n.title}</div>
+                {n.body && <div className="muted" style={{ fontSize: 13 }}>{n.body}</div>}
+                <div className="meta">{new Date(n.createdAt).toLocaleString('ru-RU')}</div>
+              </div>
+            ))}
+            {(!data?.notifications || data.notifications.length === 0) && <div className="empty">Уведомлений нет</div>}
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <h3>Сад учеников</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 12 }}>
+          {(data?.students || []).map((s: any) => (
+            <TreeView key={s.id} name={s.user.fullName} tree={s.tree} />
+          ))}
+          {(!data?.students || data.students.length === 0) && <div className="empty" style={{ gridColumn: '1 / -1' }}>Нет учеников</div>}
+        </div>
+      </div>
+    </Shell>
+  );
+}
+
+function badgeForStatus(s: string) {
+  if (s === 'COMPLETED') return 'success';
+  if (s === 'CANCELLED') return 'past';
+  return 'neutral';
+}
+function statusLabel(s: string) {
+  return ({ PLANNED: 'запланирован', COMPLETED: 'проведён', CANCELLED: 'отменён', RESCHEDULED: 'перенесён' } as any)[s] || s;
+}

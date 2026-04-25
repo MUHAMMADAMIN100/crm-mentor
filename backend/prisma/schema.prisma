@@ -1,0 +1,472 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =====================
+// USERS / ROLES
+// =====================
+enum Role {
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  EXPIRED
+  BLOCKED
+}
+
+enum SubscriptionType {
+  MONTH
+  YEAR
+}
+
+model User {
+  id               String   @id @default(cuid())
+  login            String   @unique
+  password         String
+  role             Role
+  fullName         String
+  email            String?
+  phone            String?
+  telegram         String?
+  birthDate        DateTime?
+  gender           Gender?
+  city             String?
+  activity         String?
+  category         String?           // teacher: subject
+  goal             String?           // student: learning goal
+  bio              String?           // student: extra info
+  avatarUrl        String?
+  archived         Boolean  @default(false)
+  mustChangePassword Boolean @default(true)
+  profileCompleted Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Teacher relations
+  teacherStudents     StudentProfile[] @relation("TeacherStudents")
+  teacherCourses      Course[]         @relation("TeacherCourses")
+  teacherGroups       Group[]          @relation("TeacherGroups")
+  teacherLessons      Lesson[]         @relation("TeacherLessons")
+  teacherFreeSlots    FreeSlot[]       @relation("TeacherFreeSlots")
+  teacherSubscription Subscription?
+  teacherCurrency     String?          // teacher's chosen currency
+
+  // Student profile
+  studentProfile   StudentProfile? @relation("StudentProfile")
+
+  // Common
+  notes            Note[]
+  notifications    Notification[]
+  events           PersonalEvent[]
+  sentMessages     Message[]        @relation("SentMessages")
+  chatMembers      ChatMember[]
+  homeworkSubmissions HomeworkSubmission[]
+  quizSubmissions  QuizSubmission[]
+  blockProgress    BlockProgress[]
+}
+
+// extra fields specific to a student (linked to a teacher)
+model StudentProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation("StudentProfile", fields: [userId], references: [id], onDelete: Cascade)
+  teacherId       String
+  teacher         User     @relation("TeacherStudents", fields: [teacherId], references: [id], onDelete: Cascade)
+  allowReschedule Boolean  @default(false)
+  individualPrice Float?           // per individual lesson
+  balance         Float    @default(0)
+  tree            MotivationTree?
+  groups          GroupMember[]
+  courseAccesses  CourseAccess[]
+  payments        Payment[]
+  createdAt       DateTime @default(now())
+}
+
+// =====================
+// SUBSCRIPTIONS (teacher's miz subscription, managed by admin)
+// =====================
+model Subscription {
+  id        String   @id @default(cuid())
+  teacherId String   @unique
+  teacher   User     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  status    SubscriptionStatus @default(TRIAL)
+  type      SubscriptionType?
+  startDate DateTime?
+  endDate   DateTime?
+  amount    Float?
+  updatedAt DateTime @updatedAt
+}
+
+// =====================
+// COURSES
+// =====================
+enum CourseStatus {
+  DRAFT
+  PUBLISHED_PRIVATE
+  ARCHIVED
+}
+
+model Course {
+  id          String   @id @default(cuid())
+  teacherId   String
+  teacher     User     @relation("TeacherCourses", fields: [teacherId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  category    String?
+  price       Float?
+  status      CourseStatus @default(DRAFT)
+  modules     Module[]
+  accesses    CourseAccess[]
+  groups      Group[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Module {
+  id        String   @id @default(cuid())
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title     String
+  position  Int      @default(0)
+  lessons   CourseLesson[]
+  createdAt DateTime @default(now())
+}
+
+// CourseLesson — урок курса (lesson в смысле "юнит контента"); календарный урок = Lesson
+model CourseLesson {
+  id          String   @id @default(cuid())
+  moduleId    String
+  module      Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title       String
+  position    Int      @default(0)
+  aiHelper    Boolean  @default(false)
+  isHomework  Boolean  @default(false)
+  deadlineMode String  @default("NEXT_LESSON") // NEXT_LESSON | MANUAL | NONE
+  deadlineAt  DateTime?
+  blocks      ContentBlock[]
+  homeworks   HomeworkSubmission[]
+  createdAt   DateTime @default(now())
+}
+
+enum BlockType {
+  VIDEO
+  TEXT
+  FILE
+  QUIZ
+  WRITTEN
+}
+
+enum QuizKind {
+  CHOICE        // тест с вариантами
+  MATCHING      // сопоставление
+  FILL_SENT     // заполнить предложения
+  PICK_RIGHT    // выбрать правильный вариант
+  FILL_GAPS     // заполнить пропуски
+}
+
+model ContentBlock {
+  id           String   @id @default(cuid())
+  courseLessonId String
+  courseLesson CourseLesson @relation(fields: [courseLessonId], references: [id], onDelete: Cascade)
+  type         BlockType
+  position     Int      @default(0)
+  isHomework   Boolean  @default(false)
+
+  // VIDEO
+  videoUrls    String[] @default([])
+
+  // TEXT
+  textTitle    String?
+  textBody     String?
+  miniQuizQuestion String?
+  miniQuizAnswer   Boolean?
+
+  // FILE
+  fileUrls     String[] @default([])
+
+  // QUIZ
+  quizKind     QuizKind?
+  quizPayload  Json?     // { questions: [...] } — структура зависит от quizKind
+  quizCorrect  Json?     // правильные ответы
+
+  // WRITTEN
+  writtenPrompt String?
+  writtenHint   String?
+
+  progress     BlockProgress[]
+  quizSubs     QuizSubmission[]
+}
+
+model CourseAccess {
+  id          String   @id @default(cuid())
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  studentId   String
+  student     StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  paid        Boolean  @default(false)
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+  @@unique([courseId, studentId])
+}
+
+// =====================
+// GROUPS
+// =====================
+model Group {
+  id         String   @id @default(cuid())
+  teacherId  String
+  teacher    User     @relation("TeacherGroups", fields: [teacherId], references: [id], onDelete: Cascade)
+  name       String
+  courseId   String?
+  course     Course?  @relation(fields: [courseId], references: [id])
+  members    GroupMember[]
+  lessons    Lesson[]
+  chat       Chat?
+  createdAt  DateTime @default(now())
+}
+
+model GroupMember {
+  id         String   @id @default(cuid())
+  groupId    String
+  group      Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  studentId  String
+  student    StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  pricePerLesson Float @default(0)
+  createdAt  DateTime @default(now())
+  @@unique([groupId, studentId])
+}
+
+// =====================
+// CALENDAR / LESSONS
+// =====================
+enum LessonType {
+  INDIVIDUAL
+  GROUP
+}
+
+enum LessonStatus {
+  PLANNED
+  COMPLETED
+  CANCELLED
+  RESCHEDULED
+}
+
+model Lesson {
+  id          String   @id @default(cuid())
+  teacherId   String
+  teacher     User     @relation("TeacherLessons", fields: [teacherId], references: [id], onDelete: Cascade)
+  type        LessonType
+  studentProfileId String?
+  groupId     String?
+  group       Group?   @relation(fields: [groupId], references: [id])
+  startAt     DateTime
+  durationMin Int      @default(60)
+  link        String?
+  comment     String?
+  status      LessonStatus @default(PLANNED)
+  priceCharged Float?  // фиксируется при списании
+  charged     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model FreeSlot {
+  id         String   @id @default(cuid())
+  teacherId  String
+  teacher    User     @relation("TeacherFreeSlots", fields: [teacherId], references: [id], onDelete: Cascade)
+  startAt    DateTime
+  durationMin Int     @default(60)
+  publicSlug String   @unique @default(cuid())  // для публичной ссылки записи
+  takenById  String?
+  takenName  String?
+  takenContact String?
+  createdAt  DateTime @default(now())
+}
+
+model PersonalEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  startAt   DateTime
+  reminder  Boolean  @default(false)
+  description String?
+  createdAt DateTime @default(now())
+}
+
+// =====================
+// PAYMENTS / FINANCE
+// =====================
+enum PaymentKind {
+  TOPUP   // пополнение
+  CHARGE  // списание
+  ADJUST  // ручная корректировка
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  studentId String
+  student   StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  kind      PaymentKind
+  amount    Float
+  comment   String?
+  lessonId  String?
+  createdAt DateTime @default(now())
+}
+
+// =====================
+// HOMEWORK / PROGRESS
+// =====================
+enum HomeworkStatus {
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+}
+
+model HomeworkSubmission {
+  id              String   @id @default(cuid())
+  courseLessonId  String
+  courseLesson    CourseLesson @relation(fields: [courseLessonId], references: [id], onDelete: Cascade)
+  studentId       String
+  student         User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  status          HomeworkStatus @default(IN_PROGRESS)
+  completedAt     DateTime?
+  wasOverdue      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@unique([courseLessonId, studentId])
+}
+
+model BlockProgress {
+  id        String   @id @default(cuid())
+  blockId   String
+  block     ContentBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  studentId String
+  student   User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  done      Boolean  @default(false)
+  doneAt    DateTime?
+  data      Json?    // например ответ на текстовое задание
+  @@unique([blockId, studentId])
+}
+
+model QuizSubmission {
+  id        String   @id @default(cuid())
+  blockId   String
+  block     ContentBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  studentId String
+  student   User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  answers   Json
+  score     Float?   // 0..1
+  createdAt DateTime @default(now())
+}
+
+// =====================
+// MOTIVATION TREE
+// =====================
+model MotivationTree {
+  id              String   @id @default(cuid())
+  studentId       String   @unique
+  student         StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  level           Int      @default(0)         // 0..5+
+  completedCount  Int      @default(0)
+  overdueCount    Int      @default(0)         // суммарно подряд
+  withered        Boolean  @default(false)
+  redFrame        Boolean  @default(false)
+  updatedAt       DateTime @updatedAt
+}
+
+// =====================
+// CHAT
+// =====================
+enum ChatType {
+  PRIVATE
+  GROUP
+  MIZ_SUPPORT
+}
+
+model Chat {
+  id        String   @id @default(cuid())
+  type      ChatType
+  title     String?
+  groupId   String?  @unique
+  group     Group?   @relation(fields: [groupId], references: [id])
+  members   ChatMember[]
+  messages  Message[]
+  createdAt DateTime @default(now())
+}
+
+model ChatMember {
+  id      String @id @default(cuid())
+  chatId  String
+  chat    Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt DateTime @default(now())
+  @@unique([chatId, userId])
+}
+
+enum MessageKind {
+  TEXT
+  IMAGE
+  FILE
+  VOICE
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  chatId    String
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  kind      MessageKind @default(TEXT)
+  text      String?
+  fileUrl   String?
+  createdAt DateTime @default(now())
+}
+
+// =====================
+// NOTIFICATIONS / NOTES
+// =====================
+enum NotificationKind {
+  HOMEWORK
+  FINANCE
+  BALANCE
+  BOOKING
+  RESCHEDULE
+  SYSTEM
+  SUBSCRIPTION
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      NotificationKind
+  title     String
+  body      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  body      String   @default("")
+  updatedAt DateTime @updatedAt
+}
