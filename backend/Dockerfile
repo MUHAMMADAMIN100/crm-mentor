@@ -11,6 +11,7 @@ COPY tsconfig.json nest-cli.json ./
 COPY src ./src
 RUN npx prisma generate
 RUN npm run build
+RUN ls -la dist && test -f dist/main.js
 
 # ---------- runtime ----------
 FROM node:20-alpine
