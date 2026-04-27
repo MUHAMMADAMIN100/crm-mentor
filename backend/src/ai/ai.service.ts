@@ -29,7 +29,13 @@ export class AiService {
   }
 
   async ask(userId: string, question: string, history: ChatMessage[] = []) {
-    const context = await this.ctx.build(userId);
+    let context: RoleContext;
+    try {
+      context = await this.ctx.build(userId);
+    } catch (e: any) {
+      console.error('[AI] context build failed:', e?.message, e?.stack);
+      return { answer: `Не удалось собрать контекст: ${e?.message || e}`, model: 'fallback' };
+    }
     const systemPrompt = this.buildSystemPrompt(context);
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },

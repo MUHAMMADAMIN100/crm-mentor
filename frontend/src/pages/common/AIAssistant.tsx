@@ -40,7 +40,9 @@ export function AIAssistantPage() {
       setMessages([...next, { role: 'assistant', content: r.data.answer }]);
       if (r.data.model && r.data.model !== 'fallback') setModel(prettyModel(r.data.model));
     } catch (e: any) {
-      setMessages([...next, { role: 'assistant', content: 'Не удалось получить ответ. Попробуйте ещё раз.' }]);
+      const detail = e?.response?.data?.message || e?.message || 'неизвестная ошибка';
+      const status = e?.response?.status ? ` (HTTP ${e.response.status})` : '';
+      setMessages([...next, { role: 'assistant', content: `Не удалось получить ответ${status}: ${detail}` }]);
     } finally {
       setLoading(false);
     }
