@@ -88,7 +88,7 @@ export class AiService {
     history: ChatMessage[],
     question: string,
   ) {
-    const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+    const model = process.env.GEMINI_MODEL || 'gemini-1.5-flash-latest';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     // Gemini формат: contents[].parts[].text + system_instruction отдельно
     const contents: any[] = [];
@@ -112,8 +112,9 @@ export class AiService {
         }),
       });
       if (!r.ok) {
-        console.error('[AI] Gemini error', r.status, await r.text());
-        return null;
+        const txt = await r.text();
+        console.error('[AI] Gemini error', r.status, txt);
+        return { answer: `Gemini error ${r.status}: ${txt.slice(0, 400)}`, model: `gemini-error` };
       }
       const j: any = await r.json();
       const answer =
@@ -122,7 +123,7 @@ export class AiService {
       return { answer, model: `gemini/${model}` };
     } catch (e: any) {
       console.error('[AI] Gemini exception', e?.message);
-      return null;
+      return { answer: `Gemini exception: ${e?.message}`, model: 'gemini-error' };
     }
   }
 
