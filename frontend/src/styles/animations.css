@@ -1,0 +1,278 @@
+/* ==================================================
+   MIZ — глобальные анимации
+   Цель: оживить весь интерфейс без дополнительных библиотек.
+   Все анимации работают на чистом CSS.
+   ================================================== */
+
+/* ---------- базовые keyframes ---------- */
+@keyframes miz-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes miz-fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes miz-fade-down {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes miz-fade-left {
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes miz-fade-right {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes miz-scale-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes miz-pop {
+  0%   { transform: scale(0.85); opacity: 0; }
+  60%  { transform: scale(1.04); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes miz-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+@keyframes miz-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes miz-pulse-soft {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.35); }
+  50%      { box-shadow: 0 0 0 8px rgba(124, 58, 237, 0); }
+}
+@keyframes miz-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+/* ---------- утилитарные классы ---------- */
+.anim-fade-in   { animation: miz-fade-in 0.35s ease-out both; }
+.anim-fade-up   { animation: miz-fade-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-fade-down { animation: miz-fade-down 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-fade-left { animation: miz-fade-left 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-fade-right{ animation: miz-fade-right 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-scale-in  { animation: miz-scale-in 0.25s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-pop       { animation: miz-pop 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-shake     { animation: miz-shake 0.4s ease-in-out; }
+.anim-spin      { animation: miz-spin 1s linear infinite; }
+
+.anim-delay-1 { animation-delay: 60ms; }
+.anim-delay-2 { animation-delay: 120ms; }
+.anim-delay-3 { animation-delay: 180ms; }
+.anim-delay-4 { animation-delay: 240ms; }
+.anim-delay-5 { animation-delay: 300ms; }
+
+/* ---------- автоматические анимации ---------- */
+
+/* содержимое страницы появляется плавно */
+main.content {
+  animation: miz-fade-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* любые карточки — появляются + lift при наведении */
+.card {
+  animation: miz-fade-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+/* каскадная задержка для grid-карточек */
+.cards-grid > *:nth-child(1) { animation-delay: 0ms; }
+.cards-grid > *:nth-child(2) { animation-delay: 70ms; }
+.cards-grid > *:nth-child(3) { animation-delay: 140ms; }
+.cards-grid > *:nth-child(4) { animation-delay: 210ms; }
+.cards-grid > *:nth-child(5) { animation-delay: 280ms; }
+.cards-grid > *:nth-child(6) { animation-delay: 350ms; }
+.cards-grid > *:nth-child(n+7) { animation-delay: 420ms; }
+
+/* ссылки в сайдбаре — мягкое смещение и подсветка */
+.sidebar nav a {
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease, padding 0.18s ease;
+}
+.sidebar nav a:hover {
+  transform: translateX(2px);
+}
+
+/* кнопки — масштаб при клике, плавный hover */
+.btn {
+  transition: background 0.18s ease, color 0.18s ease, transform 0.12s ease, box-shadow 0.18s ease;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0) scale(0.97); }
+.btn-primary {
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.25);
+}
+.btn-primary:hover {
+  box-shadow: 0 8px 22px rgba(124, 58, 237, 0.35);
+}
+
+/* поля ввода — мягкое свечение фокуса */
+.input, .select, .textarea {
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+.input:focus, .select:focus, .textarea:focus {
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
+}
+
+/* badges — мягкое появление */
+.badge { animation: miz-fade-in 0.25s ease-out both; }
+
+/* списки — каждый list-item появляется по очереди */
+.list > .list-item {
+  animation: miz-fade-up 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+.list > .list-item:hover {
+  transform: translateX(2px);
+  border-color: var(--primary-200);
+}
+.list > .list-item:nth-child(1) { animation-delay: 0ms; }
+.list > .list-item:nth-child(2) { animation-delay: 40ms; }
+.list > .list-item:nth-child(3) { animation-delay: 80ms; }
+.list > .list-item:nth-child(4) { animation-delay: 120ms; }
+.list > .list-item:nth-child(5) { animation-delay: 160ms; }
+.list > .list-item:nth-child(n+6) { animation-delay: 200ms; }
+
+/* строки таблицы — появляются волной */
+.table tbody tr {
+  animation: miz-fade-up 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: background 0.18s ease;
+}
+.table tbody tr:nth-child(1) { animation-delay: 0ms; }
+.table tbody tr:nth-child(2) { animation-delay: 40ms; }
+.table tbody tr:nth-child(3) { animation-delay: 80ms; }
+.table tbody tr:nth-child(4) { animation-delay: 120ms; }
+.table tbody tr:nth-child(5) { animation-delay: 160ms; }
+.table tbody tr:nth-child(n+6) { animation-delay: 200ms; }
+
+/* модалки — фон затемняется, окно вылетает с pop */
+.modal-overlay { animation: miz-fade-in 0.18s ease-out both; }
+.modal { animation: miz-pop 0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* topbar — плавное появление сверху */
+.topbar { animation: miz-fade-down 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* sidebar — плавное появление слева */
+.sidebar { animation: miz-fade-right 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* topbar avatar — pulse при первом появлении */
+.avatar {
+  transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+.avatar:hover {
+  transform: scale(1.06);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.25);
+}
+
+/* notifications */
+.notif-item { animation: miz-fade-up 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.notif-item.unread { position: relative; }
+.notif-item.unread::before {
+  content: '';
+  position: absolute; left: 4px; top: 16px;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--primary);
+  animation: miz-pulse-soft 1.6s ease-in-out infinite;
+}
+
+/* tree-card — нежное парение */
+.tree-card {
+  animation: miz-pop 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.tree-card:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: var(--shadow);
+  border-color: var(--primary-200);
+}
+.tree-vis { transition: transform 0.3s ease; }
+.tree-card:hover .tree-vis { transform: scale(1.15) rotate(-4deg); }
+
+/* badge при появлении - pop */
+.cal-event { animation: miz-fade-in 0.25s ease-out both; transition: transform 0.18s ease; }
+.cal-event:hover { transform: scale(1.04); }
+.cal-day { transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease; }
+.cal-day:hover { box-shadow: 0 4px 12px rgba(124, 58, 237, 0.08); }
+
+/* chat */
+.chat-list-item { transition: background 0.18s ease, transform 0.18s ease; }
+.chat-list-item:hover { transform: translateX(2px); }
+.chat-msg { animation: miz-fade-up 0.3s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* skeleton loader */
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 0%, #efedf6 50%, var(--surface-2) 100%);
+  background-size: 800px 100%;
+  animation: miz-shimmer 1.5s linear infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* page-enter (для будущего рутинга) */
+.page-enter {
+  animation: miz-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* logo — мягкое мерцание при наведении */
+.sidebar .logo { transition: transform 0.18s ease, color 0.18s ease; cursor: default; }
+.sidebar .logo:hover { transform: scale(1.04) rotate(-2deg); }
+
+/* auth screens — heroic appearance */
+.auth-card {
+  animation: miz-pop 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.auth-card h1 { animation: miz-fade-down 0.5s ease-out 0.1s both; }
+.auth-card p  { animation: miz-fade-down 0.5s ease-out 0.18s both; }
+.auth-card .field    { animation: miz-fade-up 0.4s ease-out both; }
+.auth-card .field:nth-of-type(1) { animation-delay: 0.22s; }
+.auth-card .field:nth-of-type(2) { animation-delay: 0.3s; }
+.auth-card .field:nth-of-type(3) { animation-delay: 0.38s; }
+.auth-card .field:nth-of-type(4) { animation-delay: 0.46s; }
+.auth-card button {
+  animation: miz-fade-up 0.4s ease-out 0.5s both;
+}
+
+/* кнопка отправки в чате — ripple вокруг при отправке */
+.ai-send:not(:disabled):active {
+  animation: miz-pulse-soft 0.6s ease-out;
+}
+
+/* tabs / pills — pop при активации */
+.ai-suggest { transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease; }
+.ai-suggest:hover {
+  box-shadow: 0 6px 16px rgba(124, 58, 237, 0.15);
+}
+.ai-suggest:active { transform: translateY(0) scale(0.97); }
+
+/* при удалении любого элемента просто можно поставить класс anim-fade-out */
+@keyframes miz-fade-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.94); }
+}
+.anim-fade-out { animation: miz-fade-out 0.24s ease-in both; }
+
+/* status dot - blink */
+@keyframes miz-blink {
+  0%, 60%, 100% { opacity: 1; }
+  30% { opacity: 0.35; }
+}
+.ai-model-pill .dot { animation: miz-blink 2s ease-in-out infinite; }
+
+/* respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
