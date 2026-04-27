@@ -79,6 +79,26 @@ input, select, textarea { font: inherit; }
   background: var(--primary);
   color: #fff;
 }
+.sidebar nav a.ai-link {
+  position: relative;
+  margin-top: 8px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(167, 139, 250, 0.06));
+  font-weight: 500;
+}
+.sidebar nav a.ai-link.active {
+  background: linear-gradient(135deg, #7c3aed, #a78bfa);
+}
+.sidebar nav a.ai-link .ai-dot {
+  display: inline-block;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #16a34a; margin-right: 4px;
+  box-shadow: 0 0 8px #16a34a;
+  animation: ai-pulse 2s ease-in-out infinite;
+}
+@keyframes ai-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.85); }
+}
 .topbar {
   display: flex; align-items: center; justify-content: space-between;
   padding: 16px 28px;

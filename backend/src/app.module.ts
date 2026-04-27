@@ -18,6 +18,7 @@ import { NotesModule } from './notes/notes.module';
 import { AdminModule } from './admin/admin.module';
 import { SubscriptionModule } from './subscription/subscription.module';
 import { PublicModule } from './public/public.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { PublicModule } from './public/public.module';
     AdminModule,
     SubscriptionModule,
     PublicModule,
+    AiModule,
   ],
 })
 export class AppModule {}

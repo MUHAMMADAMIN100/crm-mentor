@@ -8,6 +8,7 @@ import { ChangePasswordPage } from './pages/auth/ChangePassword';
 
 import { ProfilePage } from './pages/common/Profile';
 import { SettingsPage } from './pages/common/Settings';
+import { AIAssistantPage } from './pages/common/AIAssistant';
 
 import { AdminHome } from './pages/admin/AdminHome';
 import { AdminTeachers } from './pages/admin/AdminTeachers';
@@ -78,6 +79,7 @@ export default function App() {
       <Route path="/complete-profile" element={<Protected><CompleteProfilePage /></Protected>} />
       <Route path="/profile" element={<Protected><ProfilePage /></Protected>} />
       <Route path="/settings" element={<Protected><SettingsPage /></Protected>} />
+      <Route path="/ai" element={<Protected><AIAssistantPage /></Protected>} />
 
       {/* Admin */}
       <Route path="/admin" element={<Protected roles={['ADMIN']}><AdminHome /></Protected>} />

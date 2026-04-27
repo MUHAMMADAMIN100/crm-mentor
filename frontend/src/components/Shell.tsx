@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../store';
 import { useState, ReactNode } from 'react';
 
-interface NavItem { to: string; label: string; }
+interface NavItem { to: string; label: string; ai?: boolean; }
 const NAV: Record<string, NavItem[]> = {
   ADMIN: [
     { to: '/admin', label: 'Главное' },
@@ -13,6 +13,7 @@ const NAV: Record<string, NavItem[]> = {
     { to: '/admin/finance', label: 'Финансы' },
     { to: '/admin/analytics', label: 'Аналитика' },
     { to: '/admin/system', label: 'Система' },
+    { to: '/ai', label: 'ИИ-помощник', ai: true },
   ],
   TEACHER: [
     { to: '/teacher', label: 'Главное' },
@@ -22,19 +23,20 @@ const NAV: Record<string, NavItem[]> = {
     { to: '/teacher/groups', label: 'Группы' },
     { to: '/teacher/messages', label: 'Сообщения' },
     { to: '/teacher/finance', label: 'Финансы' },
+    { to: '/ai', label: 'ИИ-помощник', ai: true },
   ],
   STUDENT: [
     { to: '/student', label: 'Главное' },
     { to: '/student/calendar', label: 'Календарь' },
     { to: '/student/courses', label: 'Курсы' },
     { to: '/student/messages', label: 'Сообщения' },
+    { to: '/ai', label: 'ИИ-помощник', ai: true },
   ],
 };
 
 export function Shell({ title, children }: { title: string; children: ReactNode }) {
   const { user, logout } = useAuth();
   const nav = useNavigate();
-  const [aiOpen, setAiOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   if (!user) return null;
   const items = NAV[user.role] || [];
@@ -49,8 +51,9 @@ export function Shell({ title, children }: { title: string; children: ReactNode 
               key={i.to}
               to={i.to}
               end={i.to === '/teacher' || i.to === '/student' || i.to === '/admin'}
-              className={({ isActive }) => (isActive ? 'active' : '')}
+              className={({ isActive }) => `${isActive ? 'active' : ''} ${i.ai ? 'ai-link' : ''}`}
             >
+              {i.ai && <span className="ai-dot" />}
               {i.label}
             </NavLink>
           ))}
@@ -81,21 +84,6 @@ export function Shell({ title, children }: { title: string; children: ReactNode 
         </header>
         <main className="content">{children}</main>
       </div>
-
-      {(user.role === 'TEACHER' || user.role === 'STUDENT') && (
-        <button className="ai-fab" title="AI" onClick={() => setAiOpen(true)}>AI</button>
-      )}
-      {aiOpen && (
-        <div className="modal-overlay" onClick={() => setAiOpen(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>AI-помощник</h3>
-            <p className="muted">AI-помощник скоро будет доступен.</p>
-            <div className="modal-actions">
-              <button className="btn btn-primary" onClick={() => setAiOpen(false)}>Хорошо</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
