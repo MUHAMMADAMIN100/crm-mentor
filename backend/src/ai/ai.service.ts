@@ -42,17 +42,26 @@ export class AiService {
       ...history.slice(-8),
       { role: 'user', content: question },
     ];
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) {
-      return { answer: this.fallback(context, question), model: 'fallback' };
+
+    // Приоритет: Gemini → Groq → fallback
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (geminiKey) {
+      const r = await this.callGemini(geminiKey, systemPrompt, history, question);
+      if (r) return r;
     }
+    const groqKey = process.env.GROQ_API_KEY;
+    if (groqKey) {
+      const r = await this.callGroq(groqKey, messages);
+      if (r) return r;
+    }
+    return { answer: this.fallback(context, question), model: 'fallback' };
+  }
+
+  private async callGroq(apiKey: string, messages: ChatMessage[]) {
     try {
       const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
         body: JSON.stringify({
           model: process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
           messages,
@@ -61,14 +70,59 @@ export class AiService {
         }),
       });
       if (!r.ok) {
-        const txt = await r.text();
-        return { answer: `LLM недоступен (${r.status}): ${txt.slice(0, 200)}\n\n${this.fallback(context, question)}`, model: 'fallback' };
+        console.error('[AI] Groq error', r.status, await r.text());
+        return null;
       }
       const j: any = await r.json();
       const answer = j.choices?.[0]?.message?.content?.trim() || 'Пустой ответ';
-      return { answer, model: j.model };
+      return { answer, model: j.model || 'groq' };
     } catch (e: any) {
-      return { answer: `Ошибка обращения к LLM: ${e.message}\n\n${this.fallback(context, question)}`, model: 'fallback' };
+      console.error('[AI] Groq exception', e?.message);
+      return null;
+    }
+  }
+
+  private async callGemini(
+    apiKey: string,
+    systemPrompt: string,
+    history: ChatMessage[],
+    question: string,
+  ) {
+    const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    // Gemini формат: contents[].parts[].text + system_instruction отдельно
+    const contents: any[] = [];
+    for (const m of history.slice(-8)) {
+      if (m.role === 'system') continue;
+      contents.push({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }],
+      });
+    }
+    contents.push({ role: 'user', parts: [{ text: question }] });
+
+    try {
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents,
+          generationConfig: { temperature: 0.3, maxOutputTokens: 1000 },
+        }),
+      });
+      if (!r.ok) {
+        console.error('[AI] Gemini error', r.status, await r.text());
+        return null;
+      }
+      const j: any = await r.json();
+      const answer =
+        j.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('').trim() ||
+        'Пустой ответ';
+      return { answer, model: `gemini/${model}` };
+    } catch (e: any) {
+      console.error('[AI] Gemini exception', e?.message);
+      return null;
     }
   }
 

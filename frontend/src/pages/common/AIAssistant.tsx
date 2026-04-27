@@ -18,7 +18,7 @@ export function AIAssistantPage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [model, setModel] = useState<string>('Llama 3.1 8B Instant');
+  const [model, setModel] = useState<string>('Gemini 2.0 Flash');
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -129,7 +129,14 @@ export function AIAssistantPage() {
 }
 
 function prettyModel(m: string) {
-  if (!m) return 'Llama';
+  if (!m) return 'AI';
+  if (m.startsWith('gemini/')) {
+    const name = m.replace('gemini/', '');
+    if (name.includes('2.0-flash')) return 'Gemini 2.0 Flash';
+    if (name.includes('1.5-flash')) return 'Gemini 1.5 Flash';
+    if (name.includes('1.5-pro')) return 'Gemini 1.5 Pro';
+    return name;
+  }
   const map: Record<string, string> = {
     'llama-3.1-8b-instant': 'Llama 3.1 8B Instant',
     'llama-3.1-70b-versatile': 'Llama 3.1 70B',
