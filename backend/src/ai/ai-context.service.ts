@@ -129,7 +129,7 @@ export class AiContextService {
       students: studentsBlock,
       courses: courses.map((c: any) => ({ id: c.id, title: c.title, status: c.status })),
       lessonsToday,
-      lessonsThisWeek,
+      lessonsThisWeek: lessonsWeek,
       mizSubscription: subscription,
     };
   }
