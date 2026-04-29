@@ -48,8 +48,18 @@ function Protected({ roles, children }: { roles?: string[]; children: JSX.Elemen
   const loc = useLocation();
   if (loading) return <FullLoading />;
   if (!user) return <Navigate to="/login" replace state={{ from: loc.pathname }} />;
-  if (user.mustChangePassword && loc.pathname !== '/change-password') return <Navigate to="/change-password" replace />;
-  if (!user.profileCompleted && loc.pathname !== '/complete-profile') return <Navigate to="/complete-profile" replace />;
+  // Priority order: mustChangePassword > profileCompleted > role check.
+  // Returning children early prevents the secondary checks from issuing a
+  // redirect to a page that the primary check would immediately bounce back —
+  // which previously produced an infinite redirect loop and a blank screen.
+  if (user.mustChangePassword) {
+    if (loc.pathname !== '/change-password') return <Navigate to="/change-password" replace />;
+    return children;
+  }
+  if (!user.profileCompleted) {
+    if (loc.pathname !== '/complete-profile') return <Navigate to="/complete-profile" replace />;
+    return children;
+  }
   if (roles && !roles.includes(user.role)) return <Navigate to="/" replace />;
   return children;
 }

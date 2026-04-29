@@ -7,13 +7,16 @@ import './styles/components.css';
 import App from './App';
 import { Toaster } from './components/Toast';
 import { ConfirmHost } from './components/ConfirmDialog';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <App />
-      <Toaster />
-      <ConfirmHost />
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <App />
+        <Toaster />
+        <ConfirmHost />
+      </BrowserRouter>
+    </ErrorBoundary>
   </React.StrictMode>,
 );
