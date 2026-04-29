@@ -1,10 +1,11 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
+import { ChatService } from '../chat/chat.service';
 
 @Injectable()
 export class StudentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private chat: ChatService) {}
 
   async listForTeacher(teacherId: string) {
     return this.prisma.studentProfile.findMany({
@@ -37,6 +38,28 @@ export class StudentsService {
       },
       include: { studentProfile: { include: { tree: true } } },
     });
+
+    // Auto-create a private chat between teacher and the new student so the
+    // student appears immediately in the teacher's chat list (and vice-versa).
+    try {
+      const chat = await this.chat.getOrCreatePrivate(teacherId, created.id);
+      // Seed a welcome message only if the chat has none yet (idempotent on re-runs).
+      const msgCount = await this.prisma.message.count({ where: { chatId: chat.id } });
+      if (msgCount === 0) {
+        await this.prisma.message.create({
+          data: {
+            chatId: chat.id,
+            senderId: teacherId,
+            kind: 'TEXT',
+            text: `Привет, ${data.fullName}! Это наш рабочий чат — пиши сюда любые вопросы.`,
+          },
+        });
+      }
+    } catch (e) {
+      // Don't fail student creation if chat creation hiccups; log only.
+      console.error('[students.createStudent] chat init failed:', e);
+    }
+
     return created;
   }
 

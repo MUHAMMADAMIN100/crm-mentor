@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -6,6 +6,10 @@ export class ChatService {
   constructor(private prisma: PrismaService) {}
 
   async myChats(userId: string) {
+    // Backfill: ensure every (teacher <-> student) link has a PRIVATE chat,
+    // so legacy users created before auto-chat existed still see each other.
+    await this.ensureRoleChats(userId);
+
     return this.prisma.chat.findMany({
       where: { members: { some: { userId } } },
       include: {
@@ -14,6 +18,36 @@ export class ChatService {
       },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  /**
+   * Ensures the current user has a PRIVATE chat with every counterparty
+   * required by the data model:
+   *   - TEACHER: chat with each of their students
+   *   - STUDENT: chat with their teacher
+   * Idempotent: skips pairs that already have a chat.
+   */
+  private async ensureRoleChats(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return;
+
+    if (user.role === 'TEACHER') {
+      const profiles = await this.prisma.studentProfile.findMany({
+        where: { teacherId: userId, user: { archived: false } },
+        select: { userId: true },
+      });
+      for (const sp of profiles) {
+        await this.getOrCreatePrivate(userId, sp.userId);
+      }
+    } else if (user.role === 'STUDENT') {
+      const sp = await this.prisma.studentProfile.findUnique({
+        where: { userId },
+        select: { teacherId: true },
+      });
+      if (sp?.teacherId) {
+        await this.getOrCreatePrivate(userId, sp.teacherId);
+      }
+    }
   }
 
   async getOrCreatePrivate(userAId: string, userBId: string) {
