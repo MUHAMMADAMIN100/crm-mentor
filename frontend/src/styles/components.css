@@ -517,6 +517,300 @@
 .cal-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
 .cal-month { font-weight: 600; min-width: 160px; text-align: center; }
 
+/* ---------- Avatar dropdown menu ---------- */
+.avatar-menu {
+  position: absolute;
+  right: 0;
+  top: 44px;
+  min-width: 200px;
+  padding: 8px;
+  z-index: 50;
+}
+
+/* ===================================================================
+   COMPREHENSIVE RESPONSIVE — desktop / laptop / tablet / phone
+   Breakpoints:
+     Default        — > 1280px : desktop (wide)
+     <= 1280px      — laptop
+     <= 1024px      — large tablet / iPad landscape
+     <= 900px       — tablet portrait → hamburger sidebar (overrides above)
+     <= 640px       — phone large
+     <= 400px       — phone small
+   =================================================================== */
+
+/* Prevent horizontal page scroll & enable text-size-adjust on touch */
+html, body { overflow-x: hidden; -webkit-text-size-adjust: 100%; }
+img, video, canvas, svg { max-width: 100%; }
+table { max-width: 100%; }
+
+/* On iOS, font-size < 16px on inputs causes auto-zoom; bump on touch screens */
+@media (hover: none) and (pointer: coarse) {
+  .input, .select, .textarea, .ai-input, .chat-input textarea {
+    font-size: 16px;
+  }
+  /* Bigger touch targets */
+  .btn { min-height: 40px; }
+  .btn-sm { min-height: 32px; }
+}
+
+/* ---------- Laptop (~1280px) ---------- */
+@media (max-width: 1280px) {
+  main.content { padding: 24px; }
+  .topbar { padding: 14px 22px; }
+  .cards-grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+  .fin-stats { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+}
+
+/* ---------- Large tablet / iPad landscape (~1024px) ---------- */
+@media (max-width: 1024px) {
+  .app-shell { grid-template-columns: 220px 1fr; }
+  .sidebar { padding: 18px 12px; }
+  .sidebar .logo { font-size: 20px; margin-bottom: 22px; }
+  .sidebar nav a { padding: 8px 12px; font-size: 13.5px; }
+  main.content { padding: 22px; }
+  .topbar { padding: 13px 20px; }
+  .topbar .title { font-size: 20px; }
+
+  /* Course view: narrower TOC sidebar */
+  .course-shell { grid-template-columns: 260px 1fr !important; }
+  /* Chat: narrower list */
+  .chat-shell { grid-template-columns: 240px 1fr; }
+
+  .fin-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ---------- Tablet (≤900px) — hamburger sidebar ---------- */
+@media (max-width: 900px) {
+  .topbar .title { font-size: 17px; }
+  .topbar { padding: 11px 14px; gap: 8px; }
+  .topbar .right { gap: 10px; }
+  .topbar .right .muted { display: none; }
+
+  /* Avatar dropdown — bottom sheet on mobile/tablet for safe placement */
+  .avatar-menu {
+    position: fixed !important;
+    left: 12px;
+    right: 12px;
+    top: auto !important;
+    bottom: 12px;
+    min-width: 0 !important;
+    max-height: 50vh;
+    overflow-y: auto;
+    border-radius: 14px;
+    padding: 10px !important;
+    z-index: 200;
+    animation: miz-fade-up 0.22s ease-out both;
+  }
+  .avatar-menu .btn-ghost {
+    padding: 14px;
+    font-size: 15px;
+  }
+
+  /* Calendar toolbar wraps */
+  .cal-toolbar { gap: 6px; }
+  .cal-toolbar .cal-month { min-width: 130px; font-size: 14px; }
+  .cal-toolbar .btn-ghost { font-size: 13px; }
+
+  /* Quiz options bigger touch targets */
+  .quiz-option { padding: 12px 14px; font-size: 15px; }
+  .quiz-option .marker { width: 26px; height: 26px; }
+
+  /* Notes textarea */
+  .notes-textarea { min-height: 280px; }
+
+  /* AI shell — proper height on tablets accounting for keyboard */
+  .ai-shell { height: calc(100vh - 100px); height: calc(100dvh - 100px); }
+  .ai-input { font-size: 15px; }
+  .ai-msg { max-width: 92%; }
+
+  /* Chat shell */
+  .chat-shell { height: calc(100vh - 110px); height: calc(100dvh - 110px); }
+}
+
+/* ---------- Mobile (≤640px) ---------- */
+@media (max-width: 640px) {
+  /* Topbar tighter */
+  .topbar { padding: 10px 12px; }
+  .topbar .title { font-size: 16px; }
+  .menu-toggle { width: 36px; height: 36px; }
+  .avatar { width: 34px; height: 34px; font-size: 14px; }
+
+  /* Content paddings */
+  main.content { padding: 14px 12px; }
+
+  /* Cards spacing */
+  .cards-grid { gap: 12px; }
+  .card { padding: 16px; border-radius: 12px; }
+  .card h3 { font-size: 15px; margin-bottom: 12px; }
+
+  /* Stats cards full-width on small phones */
+  .fin-stats { grid-template-columns: 1fr; }
+  .fin-stat { padding: 14px 16px; }
+  .fin-stat .value { font-size: 22px; }
+
+  /* Buttons & inputs touch-friendly */
+  .btn { padding: 11px 16px; font-size: 14px; }
+  .btn-sm { padding: 8px 12px; font-size: 13px; }
+  .input, .select, .textarea { padding: 11px 12px; }
+
+  /* Forms — single column */
+  .row { flex-direction: column; gap: 10px; }
+  .row > * { width: 100%; }
+
+  /* Modals — near-fullscreen */
+  .modal-overlay { padding: 8px; }
+  .modal {
+    max-width: 100% !important;
+    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px);
+    overflow-y: auto;
+    padding: 16px !important;
+    border-radius: 14px;
+  }
+  .modal h3 { font-size: 16px; margin-bottom: 12px; }
+  .modal-actions { gap: 8px; }
+  .modal-actions .btn { flex: 1; }
+
+  /* Confirm modal compact */
+  .confirm-modal { padding: 18px !important; }
+  .confirm-icon { width: 48px; height: 48px; }
+  .confirm-icon svg { width: 24px; height: 24px; }
+
+  /* PDF preview — full screen */
+  .pdf-preview-modal {
+    max-width: 100% !important;
+    max-height: 100% !important;
+    height: 100vh; height: 100dvh;
+    border-radius: 0;
+    padding: 12px !important;
+  }
+  .pdf-preview-modal .modal-actions { padding-top: 8px; }
+  .pdf-preview-modal .modal-actions a,
+  .pdf-preview-modal .modal-actions .btn { flex: 1; text-align: center; }
+
+  /* Calendar — show only first event per day, compact */
+  .cal-day { min-height: 60px; padding: 3px; }
+  .cal-day .num { font-size: 11px; }
+  .cal-event { font-size: 9px; padding: 1px 3px; }
+  .calendar-grid > div[style*="font-size: 12px"] { font-size: 10px !important; padding: 2px 4px !important; }
+
+  /* Tables — wrap in scroll container */
+  .card .table { font-size: 13px; }
+  .table th, .table td { padding: 9px 10px; }
+
+  /* Lists */
+  .list-item { padding: 10px 12px; font-size: 14px; }
+
+  /* Chat */
+  .chat-shell { height: calc(100vh - 100px); height: calc(100dvh - 100px); border-radius: 12px; }
+  .chat-list-item { padding: 12px; }
+  .chat-msg { max-width: 85%; padding: 9px 12px; font-size: 14px; }
+  .chat-input { padding: 10px; gap: 6px; }
+  .chat-input textarea { font-size: 15px; }
+  .chat-input .btn { padding: 10px 14px; font-size: 13px; }
+
+  /* AI shell */
+  .ai-shell { height: calc(100vh - 90px); height: calc(100dvh - 90px); border-radius: 12px; }
+  .ai-header { padding: 14px 16px; gap: 10px; }
+  .ai-avatar { width: 38px; height: 38px; }
+  .ai-avatar svg { width: 20px; height: 20px; }
+  .ai-title { font-size: 15px; }
+  .ai-subtitle { font-size: 11px; }
+  .ai-model-pill { padding: 4px 10px; font-size: 11px; }
+  .ai-empty { padding: 12px; gap: 12px; }
+  .ai-empty .big-bot { width: 76px; height: 76px; border-radius: 18px; }
+  .ai-empty .big-bot svg { width: 38px; height: 38px; }
+  .ai-empty h2 { font-size: 18px; }
+  .ai-empty p { font-size: 13px; line-height: 1.45; }
+  .ai-suggest { padding: 11px 13px; font-size: 13px; }
+  .ai-body { padding: 18px 14px; gap: 10px; }
+  .ai-msg .bubble { padding: 10px 13px; font-size: 13.5px; }
+  .ai-input-bar { padding: 10px 12px; }
+  .ai-send { width: 40px; height: 40px; }
+
+  /* Toasts */
+  .toast { padding: 11px 12px; }
+  .toast-body { font-size: 13px; }
+  .toast-icon { width: 28px; height: 28px; }
+  .toast-icon svg { width: 16px; height: 16px; }
+
+  /* Quiz UI */
+  .quiz-question { padding: 12px 14px; }
+  .quiz-question h5 { font-size: 14px; }
+  .quiz-result { padding: 18px 14px; }
+  .quiz-result .score-num { font-size: 36px; }
+
+  /* Quiz builder */
+  .qb-question { padding: 12px; }
+  .qb-option { flex-wrap: nowrap; }
+
+  /* Tree cards */
+  .tree-card { padding: 10px; min-width: 0; }
+  .tree-vis { font-size: 30px; }
+  .tree-name { font-size: 12px; }
+
+  /* Notification items */
+  .notif-item { padding: 10px 12px; }
+  .notif-item .meta { font-size: 10px; }
+
+  /* Auth screens */
+  .auth-card { padding: 24px 20px; max-width: 100%; }
+  .auth-card h1 { font-size: 22px; }
+  .auth-card p { font-size: 13px; }
+
+  /* Day-detail items */
+  .day-detail-item { padding: 9px 10px; gap: 8px; }
+  .day-detail-item .time { min-width: 44px; font-size: 13px; }
+
+  /* Sidebar nav — bigger taps when open */
+  .sidebar nav a { padding: 12px 14px; font-size: 15px; }
+  .sidebar { padding: 20px 14px; }
+
+  /* Hide cosmetic helpers on small screens */
+  .h-divider { margin: 10px 0; }
+}
+
+/* ---------- Small phone (≤400px) ---------- */
+@media (max-width: 400px) {
+  .topbar { padding: 8px 10px; }
+  .topbar .title { font-size: 15px; }
+  main.content { padding: 12px 10px; }
+  .card { padding: 14px; }
+  .card h3 { font-size: 14px; }
+  .calendar-grid { gap: 1px; }
+  .cal-day { min-height: 50px; padding: 2px; }
+  .cal-day .num { font-size: 10px; }
+  .cal-event { font-size: 9px; }
+  .cal-day .cal-event:nth-child(n+2) { display: none; }
+  .ai-suggestions { gap: 8px; }
+  .modal { padding: 14px !important; }
+  .btn { padding: 10px 14px; }
+  .fin-bars { height: 60px; }
+  .toast-stack { right: 6px; left: 6px; top: 6px; gap: 6px; }
+}
+
+/* ---------- Landscape orientation on phones ---------- */
+@media (max-width: 900px) and (orientation: landscape) and (max-height: 500px) {
+  .ai-shell, .chat-shell { height: calc(100vh - 80px); }
+  .ai-empty { padding: 6px; gap: 8px; }
+  .ai-empty .big-bot { width: 56px; height: 56px; }
+  .ai-empty h2 { font-size: 16px; }
+  .modal { max-height: 90vh; }
+}
+
+/* ---------- High-DPI / retina sharper borders ---------- */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .card, .modal, .input, .select, .textarea { -webkit-font-smoothing: antialiased; }
+}
+
+/* ---------- Print (optional, used for PDF generation) ---------- */
+@media print {
+  .sidebar, .topbar, .menu-toggle, .toast-stack, .modal-overlay { display: none !important; }
+  .app-shell { grid-template-columns: 1fr !important; }
+  main.content { padding: 0 !important; }
+  .card { box-shadow: none; border: 1px solid #ddd; break-inside: avoid; }
+}
+
 /* day-detail list */
 .day-detail-list { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; }
 .day-detail-item {

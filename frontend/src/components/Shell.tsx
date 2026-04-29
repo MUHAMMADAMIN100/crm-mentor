@@ -103,7 +103,7 @@ export function Shell({ title, children }: { title: string; children: ReactNode 
               {menuOpen && (
                 <>
                   <div onClick={() => setMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 49 }} />
-                  <div className="card" style={{ position: 'absolute', right: 0, top: 44, minWidth: 200, padding: 8, zIndex: 50 }}>
+                  <div className="card avatar-menu">
                     <button className="btn btn-ghost" style={{ width: '100%', textAlign: 'left' }} onClick={() => { setMenuOpen(false); nav('/profile'); }}>Профиль</button>
                     <button className="btn btn-ghost" style={{ width: '100%', textAlign: 'left' }} onClick={() => { setMenuOpen(false); nav('/settings'); }}>Настройки</button>
                     <div className="h-divider" />
