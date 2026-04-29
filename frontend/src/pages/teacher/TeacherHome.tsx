@@ -2,26 +2,23 @@ import { useEffect, useState } from 'react';
 import { Shell } from '../../components/Shell';
 import { api } from '../../api';
 import { TreeView } from '../../components/Tree';
+import { SkeletonCard, SkeletonGrid } from '../../components/Skeleton';
 
 export function TeacherHome() {
   const [data, setData] = useState<any>(null);
-  const [note, setNote] = useState('');
-  const [savedAt, setSavedAt] = useState('');
 
   useEffect(() => {
-    api.get('/teacher/dashboard').then((r) => {
-      setData(r.data);
-      setNote(r.data.note?.body || '');
-    });
+    api.get('/teacher/dashboard').then((r) => setData(r.data));
   }, []);
 
-  useEffect(() => {
-    const t = setTimeout(() => {
-      if (!data) return;
-      api.put('/notes', { body: note }).then(() => setSavedAt(new Date().toLocaleTimeString('ru-RU')));
-    }, 700);
-    return () => clearTimeout(t);
-  }, [note]);
+  if (!data) {
+    return (
+      <Shell title="Главное">
+        <SkeletonGrid count={3} />
+        <div style={{ marginTop: 16 }}><SkeletonCard lines={5} /></div>
+      </Shell>
+    );
+  }
 
   return (
     <Shell title="Главное">
@@ -40,17 +37,11 @@ export function TeacherHome() {
         </div>
 
         <div className="card">
-          <h3>Заметки</h3>
-          <textarea
-            className="textarea"
-            maxLength={1000}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Ваши заметки сохраняются автоматически…"
-            style={{ minHeight: 130 }}
-          />
-          <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
-            {note.length}/1000 · {savedAt && `сохранено в ${savedAt}`}
+          <h3>Сводка</h3>
+          <div className="list">
+            <div className="list-item"><span className="muted">Учеников</span><strong>{data?.students?.length ?? 0}</strong></div>
+            <div className="list-item"><span className="muted">Уроков на сегодня</span><strong>{data?.todayLessons?.length ?? 0}</strong></div>
+            <div className="list-item"><span className="muted">Уведомлений</span><strong>{(data?.notifications || []).length}</strong></div>
           </div>
         </div>
 

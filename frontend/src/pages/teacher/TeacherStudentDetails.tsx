@@ -1,33 +1,63 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Shell } from '../../components/Shell';
 import { api } from '../../api';
 import { TreeView } from '../../components/Tree';
+import { Loading } from '../../components/Loading';
+import { toast } from '../../store';
 
 export function TeacherStudentDetails() {
   const { id } = useParams();
+  const nav = useNavigate();
   const [s, setS] = useState<any>(null);
   const [topup, setTopup] = useState({ amount: 0, comment: '' });
+  const [topping, setTopping] = useState(false);
 
   function load() { api.get(`/students/${id}`).then((r) => setS(r.data)); }
   useEffect(load, [id]);
 
   async function toggleReschedule() {
-    await api.patch(`/students/${id}`, { allowReschedule: !s.allowReschedule });
-    load();
+    try {
+      await api.patch(`/students/${id}`, { allowReschedule: !s.allowReschedule });
+      toast.success('Настройка обновлена');
+      load();
+    } catch { toast.error('Не удалось обновить'); }
   }
   async function setPrice(v: number) {
-    await api.patch(`/students/${id}`, { individualPrice: v });
-    load();
+    try {
+      await api.patch(`/students/${id}`, { individualPrice: v });
+      toast.success('Цена обновлена');
+      load();
+    } catch { toast.error('Не удалось обновить'); }
   }
   async function doTopup() {
-    await api.post(`/finance/teacher/students/${id}/topup`, topup);
-    setTopup({ amount: 0, comment: '' }); load();
+    if (!topup.amount || topup.amount <= 0) { toast.warning('Сумма должна быть положительной'); return; }
+    setTopping(true);
+    try {
+      await api.post(`/finance/teacher/students/${id}/topup`, topup);
+      toast.success(`Баланс пополнен на ${topup.amount}`);
+      setTopup({ amount: 0, comment: '' });
+      load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'Ошибка пополнения');
+    } finally {
+      setTopping(false);
+    }
+  }
+  async function openChat() {
+    if (!s) return;
+    try {
+      await api.post(`/chat/private/${s.userId}`);
+      nav('/teacher/messages');
+    } catch { toast.error('Не удалось открыть чат'); }
   }
 
-  if (!s) return <Shell title="Ученик"><div>Загрузка…</div></Shell>;
+  if (!s) return <Shell title="Ученик"><Loading label="Загружаем профиль…" /></Shell>;
   return (
     <Shell title={s.user.fullName}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        <button className="btn btn-primary" onClick={openChat}>✉️ Написать ученику</button>
+      </div>
       <div className="cards-grid">
         <div className="card">
           <h3>Профиль</h3>
@@ -53,9 +83,9 @@ export function TeacherStudentDetails() {
         <div className="card">
           <h3>Баланс: <span style={{ color: s.balance < 0 ? 'var(--danger)' : 'var(--primary)' }}>{s.balance}</span></h3>
           <div className="row">
-            <input className="input" type="number" placeholder="Сумма" value={topup.amount} onChange={(e) => setTopup({ ...topup, amount: +e.target.value })} />
+            <input className="input" type="number" placeholder="Сумма" value={topup.amount || ''} onChange={(e) => setTopup({ ...topup, amount: +e.target.value })} />
             <input className="input" placeholder="Комментарий" value={topup.comment} onChange={(e) => setTopup({ ...topup, comment: e.target.value })} />
-            <button className="btn btn-primary" onClick={doTopup}>Пополнить</button>
+            <button className="btn btn-primary" onClick={doTopup} disabled={topping}>{topping ? '…' : 'Пополнить'}</button>
           </div>
           <div className="h-divider" />
           <h3>История</h3>

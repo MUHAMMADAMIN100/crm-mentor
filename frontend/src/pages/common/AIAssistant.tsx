@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Shell } from '../../components/Shell';
 import { api } from '../../api';
-import { useAuth } from '../../store';
+import { useAuth, useAi, toast, confirmDialog } from '../../store';
 import '../../styles/ai.css';
-
-interface Message { role: 'user' | 'assistant'; content: string; }
 
 const ROLE_LABEL: Record<string, string> = {
   ADMIN: 'Доступ администратора',
@@ -14,15 +12,14 @@ const ROLE_LABEL: Record<string, string> = {
 
 export function AIAssistantPage() {
   const { user } = useAuth();
-  const [messages, setMessages] = useState<Message[]>([]);
+  const { messages, model, setMessages, setModel, clear } = useAi();
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [model, setModel] = useState<string>('Gemini 2.0 Flash');
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    api.get('/ai/suggestions').then((r) => setSuggestions(r.data.items));
+    api.get('/ai/suggestions').then((r) => setSuggestions(r.data.items)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -32,17 +29,17 @@ export function AIAssistantPage() {
   async function send(question: string) {
     if (!question.trim() || loading) return;
     setInput('');
-    const next: Message[] = [...messages, { role: 'user', content: question }];
+    const next = [...messages, { role: 'user' as const, content: question }];
     setMessages(next);
     setLoading(true);
     try {
       const r = await api.post('/ai/ask', { question, history: messages });
-      setMessages([...next, { role: 'assistant', content: r.data.answer }]);
+      setMessages([...next, { role: 'assistant' as const, content: r.data.answer }]);
       if (r.data.model && r.data.model !== 'fallback') setModel(prettyModel(r.data.model));
     } catch (e: any) {
       const detail = e?.response?.data?.message || e?.message || 'неизвестная ошибка';
       const status = e?.response?.status ? ` (HTTP ${e.response.status})` : '';
-      setMessages([...next, { role: 'assistant', content: `Не удалось получить ответ${status}: ${detail}` }]);
+      setMessages([...next, { role: 'assistant' as const, content: `Не удалось получить ответ${status}: ${detail}` }]);
     } finally {
       setLoading(false);
     }
@@ -53,6 +50,12 @@ export function AIAssistantPage() {
       e.preventDefault();
       send(input);
     }
+  }
+
+  async function clearChat() {
+    if (messages.length === 0) return;
+    const ok = await confirmDialog({ title: 'Очистить диалог?', body: 'История сообщений будет удалена.', danger: true, okLabel: 'Очистить' });
+    if (ok) { clear(); toast.success('История очищена'); }
   }
 
   return (
@@ -66,7 +69,10 @@ export function AIAssistantPage() {
             <div className="ai-title">ИИ-помощник</div>
             <div className="ai-subtitle">Анализирует данные CRM в реальном времени · {ROLE_LABEL[user?.role || 'STUDENT']}</div>
           </div>
-          <div className="ai-model-pill"><span className="dot" /> {model}</div>
+          {messages.length > 0 && (
+            <button className="btn btn-sm btn-ghost" style={{ marginLeft: 'auto' }} onClick={clearChat} title="Очистить диалог">Очистить</button>
+          )}
+          <div className="ai-model-pill"><span className="dot" /> {model || 'AI'}</div>
         </div>
 
         <div className="ai-body" ref={bodyRef}>
@@ -121,7 +127,7 @@ export function AIAssistantPage() {
           </button>
         </div>
         <div className="ai-disclaimer">
-          ИИ анализирует актуальные данные из вашей роли. Ответы могут быть неточными.
+          ИИ анализирует актуальные данные из вашей роли. История сохраняется на устройстве до выхода.
         </div>
       </div>
     </Shell>
@@ -132,6 +138,7 @@ function prettyModel(m: string) {
   if (!m) return 'AI';
   if (m.startsWith('gemini/')) {
     const name = m.replace('gemini/', '');
+    if (name.includes('2.5-flash')) return 'Gemini 2.5 Flash';
     if (name.includes('2.0-flash')) return 'Gemini 2.0 Flash';
     if (name.includes('1.5-flash')) return 'Gemini 1.5 Flash';
     if (name.includes('1.5-pro')) return 'Gemini 1.5 Pro';

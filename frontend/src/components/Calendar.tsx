@@ -14,7 +14,12 @@ interface Props {
   onEventClick?: (e: CalEvent) => void;
 }
 
+function isSameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
 export function MonthCalendar({ month, events, onDayClick, onEventClick }: Props) {
+  const today = new Date();
   const cells = useMemo(() => {
     const first = new Date(month.getFullYear(), month.getMonth(), 1);
     const startWeekday = (first.getDay() + 6) % 7; // ISO Monday
@@ -41,18 +46,21 @@ export function MonthCalendar({ month, events, onDayClick, onEventClick }: Props
     <div>
       <div className="calendar-grid" style={{ marginBottom: 4 }}>
         {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((d) => (
-          <div key={d} style={{ fontSize: 12, color: 'var(--text-soft)', padding: '4px 8px' }}>{d}</div>
+          <div key={d} style={{ fontSize: 12, color: 'var(--text-soft)', padding: '4px 8px', fontWeight: 500 }}>{d}</div>
         ))}
       </div>
       <div className="calendar-grid">
         {cells.map(({ date, outside }, idx) => {
-          const ymd = date.toDateString();
-          const dayEvents = events.filter((e) => new Date(e.startAt).toDateString() === ymd);
+          const dayEvents = events.filter((e) => isSameDay(new Date(e.startAt), date))
+            .sort((a, b) => +new Date(a.startAt) - +new Date(b.startAt));
+          const todayCls = isSameDay(date, today) ? 'today' : '';
           return (
             <div
               key={idx}
-              className={`cal-day ${outside ? 'other-month' : ''}`}
+              className={`cal-day ${outside ? 'other-month' : ''} ${todayCls}`}
               onClick={() => onDayClick && onDayClick(date)}
+              role="button"
+              tabIndex={0}
             >
               <div className="num">{date.getDate()}</div>
               {dayEvents.slice(0, 4).map((e) => (
@@ -60,11 +68,12 @@ export function MonthCalendar({ month, events, onDayClick, onEventClick }: Props
                   key={e.id}
                   className={`cal-event ${e.variant || 'lesson'}`}
                   onClick={(ev) => { ev.stopPropagation(); onEventClick && onEventClick(e); }}
+                  title={`${new Date(e.startAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })} ${e.title}`}
                 >
                   {new Date(e.startAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })} {e.title}
                 </div>
               ))}
-              {dayEvents.length > 4 && <div className="muted" style={{ fontSize: 11 }}>+{dayEvents.length - 4}</div>}
+              {dayEvents.length > 4 && <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>+{dayEvents.length - 4}</div>}
             </div>
           );
         })}

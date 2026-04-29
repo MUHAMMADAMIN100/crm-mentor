@@ -9,6 +9,8 @@ import { ChangePasswordPage } from './pages/auth/ChangePassword';
 import { ProfilePage } from './pages/common/Profile';
 import { SettingsPage } from './pages/common/Settings';
 import { AIAssistantPage } from './pages/common/AIAssistant';
+import { NotesPage } from './pages/common/Notes';
+import { Loading } from './components/Loading';
 
 import { AdminHome } from './pages/admin/AdminHome';
 import { AdminTeachers } from './pages/admin/AdminTeachers';
@@ -37,18 +39,14 @@ import { StudentMessages } from './pages/student/StudentMessages';
 
 import { PublicSlots } from './pages/public/PublicSlots';
 
-function Loading() {
-  return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
-      Загрузка…
-    </div>
-  );
+function FullLoading() {
+  return <Loading full label="Загрузка…" />;
 }
 
 function Protected({ roles, children }: { roles?: string[]; children: JSX.Element }) {
   const { user, loading } = useAuth();
   const loc = useLocation();
-  if (loading) return <Loading />;
+  if (loading) return <FullLoading />;
   if (!user) return <Navigate to="/login" replace state={{ from: loc.pathname }} />;
   if (user.mustChangePassword && loc.pathname !== '/change-password') return <Navigate to="/change-password" replace />;
   if (!user.profileCompleted && loc.pathname !== '/complete-profile') return <Navigate to="/complete-profile" replace />;
@@ -58,7 +56,7 @@ function Protected({ roles, children }: { roles?: string[]; children: JSX.Elemen
 
 function HomeRedirect() {
   const { user, loading } = useAuth();
-  if (loading) return <Loading />;
+  if (loading) return <FullLoading />;
   if (!user) return <Navigate to="/login" replace />;
   if (user.mustChangePassword) return <Navigate to="/change-password" replace />;
   if (!user.profileCompleted) return <Navigate to="/complete-profile" replace />;
@@ -80,6 +78,7 @@ export default function App() {
       <Route path="/profile" element={<Protected><ProfilePage /></Protected>} />
       <Route path="/settings" element={<Protected><SettingsPage /></Protected>} />
       <Route path="/ai" element={<Protected><AIAssistantPage /></Protected>} />
+      <Route path="/notes" element={<Protected><NotesPage /></Protected>} />
 
       {/* Admin */}
       <Route path="/admin" element={<Protected roles={['ADMIN']}><AdminHome /></Protected>} />

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../../api';
+import { Loading } from '../../components/Loading';
+import { toast } from '../../store';
 
 export function PublicSlots() {
   const { teacherId } = useParams();
@@ -8,18 +10,26 @@ export function PublicSlots() {
   const [picked, setPicked] = useState<any>(null);
   const [form, setForm] = useState({ name: '', contact: '' });
   const [done, setDone] = useState(false);
+  const [booking, setBooking] = useState(false);
 
   function load() { api.get(`/public/teachers/${teacherId}/slots`).then((r) => setData(r.data)); }
   useEffect(load, [teacherId]);
 
   async function book() {
-    await api.post(`/public/slots/${picked.publicSlug}/book`, form);
-    setDone(true);
-    setPicked(null);
-    load();
+    if (!form.name.trim() || !form.contact.trim()) { toast.warning('Заполните имя и контакт'); return; }
+    setBooking(true);
+    try {
+      await api.post(`/public/slots/${picked.publicSlug}/book`, form);
+      toast.success('Вы записаны!');
+      setDone(true);
+      setPicked(null);
+      load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'Не удалось записаться');
+    } finally { setBooking(false); }
   }
 
-  if (!data) return <div className="auth-shell"><div>Загрузка…</div></div>;
+  if (!data) return <div className="auth-shell"><Loading label="Загружаем расписание…" /></div>;
 
   return (
     <div className="auth-shell">
@@ -47,7 +57,7 @@ export function PublicSlots() {
             <div className="field"><label>Контакт (телефон/Telegram/email)</label><input className="input" value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} /></div>
             <div className="modal-actions">
               <button className="btn" onClick={() => setPicked(null)}>Назад</button>
-              <button className="btn btn-primary" onClick={book} disabled={!form.name || !form.contact}>Записаться</button>
+              <button className="btn btn-primary" onClick={book} disabled={!form.name || !form.contact || booking}>{booking ? 'Записываем…' : 'Записаться'}</button>
             </div>
           </>
         )}

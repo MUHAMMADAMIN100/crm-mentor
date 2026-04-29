@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Shell } from '../../components/Shell';
 import { api } from '../../api';
 import { TreeView } from '../../components/Tree';
+import { SkeletonGrid } from '../../components/Skeleton';
 
 export function StudentHome() {
   const [data, setData] = useState<any>(null);
@@ -13,6 +14,14 @@ export function StudentHome() {
     api.get('/progress/me').then((r) => setProgress(r.data));
   }, []);
 
+  if (!data && !progress) {
+    return (
+      <Shell title="Главное">
+        <SkeletonGrid count={4} />
+      </Shell>
+    );
+  }
+
   return (
     <Shell title="Главное">
       <div className="cards-grid">
@@ -21,7 +30,10 @@ export function StudentHome() {
           {progress ? (
             <>
               <div onClick={() => setShowProgress(!showProgress)} style={{ cursor: 'pointer' }}>
-                <div>Уроки: {progress.lessons[0]} / {progress.lessons[1]}</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                  <span style={{ fontSize: 28, fontWeight: 700, color: 'var(--primary)' }}>{progress.lessons[0]}</span>
+                  <span className="muted">/ {progress.lessons[1]} уроков</span>
+                </div>
                 <div className="muted" style={{ fontSize: 12 }}>Нажмите для деталей</div>
               </div>
               {showProgress && (
@@ -52,7 +64,7 @@ export function StudentHome() {
                   <div style={{ fontWeight: 500 }}>{new Date(l.startAt).toLocaleString('ru-RU')}</div>
                   <div className="muted" style={{ fontSize: 12 }}>{l.type === 'INDIVIDUAL' ? 'Индивидуальный' : 'Групповой'}</div>
                 </div>
-                {l.link && <a href={l.link} target="_blank" className="btn btn-sm btn-primary">Войти</a>}
+                {l.link && <a href={l.link} target="_blank" rel="noreferrer" className="btn btn-sm btn-primary">Войти</a>}
               </div>
             ))}
             {(!data?.upcomingLessons || data.upcomingLessons.length === 0) && <div className="empty">Нет занятий</div>}

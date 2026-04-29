@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 
 export function Modal({
   open,
@@ -15,12 +15,35 @@ export function Modal({
   footer?: ReactNode;
   width?: number;
 }) {
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open, onClose]);
+
   if (!open) return null;
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={width ? { maxWidth: width } : undefined} onClick={(e) => e.stopPropagation()}>
-        <h3>{title}</h3>
-        {children}
+    <div className="modal-overlay" role="presentation" onClick={onClose}>
+      <div
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+        style={width ? { maxWidth: width } : undefined}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-header">
+          <h3 id="modal-title">{title}</h3>
+          <button className="modal-close" onClick={onClose} aria-label="Закрыть">×</button>
+        </div>
+        <div className="modal-body">{children}</div>
         {footer && <div className="modal-actions">{footer}</div>}
       </div>
     </div>
