@@ -3,6 +3,7 @@ import { Shell } from '../../components/Shell';
 import { api } from '../../api';
 import { TreeView } from '../../components/Tree';
 import { SkeletonGrid } from '../../components/Skeleton';
+import { NotesCard } from '../../components/NotesCard';
 
 export function StudentHome() {
   const [data, setData] = useState<any>(null);
@@ -88,6 +89,8 @@ export function StudentHome() {
             {(!data?.homeworks || data.homeworks.length === 0) && <div className="empty">Нет домашек</div>}
           </div>
         </div>
+
+        <NotesCard />
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>

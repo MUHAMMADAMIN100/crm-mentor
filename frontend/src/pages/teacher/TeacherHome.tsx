@@ -3,6 +3,7 @@ import { Shell } from '../../components/Shell';
 import { api } from '../../api';
 import { TreeView } from '../../components/Tree';
 import { SkeletonCard, SkeletonGrid } from '../../components/Skeleton';
+import { NotesCard } from '../../components/NotesCard';
 
 export function TeacherHome() {
   const [data, setData] = useState<any>(null);
@@ -44,6 +45,8 @@ export function TeacherHome() {
             <div className="list-item"><span className="muted">Уведомлений</span><strong>{(data?.notifications || []).length}</strong></div>
           </div>
         </div>
+
+        <NotesCard />
 
         <div className="card" style={{ gridColumn: 'span 2' }}>
           <h3>Уведомления</h3>

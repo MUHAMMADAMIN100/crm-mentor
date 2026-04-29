@@ -112,6 +112,8 @@ input, select, textarea { font: inherit; }
   padding: 16px 28px;
   background: #fff;
   border-bottom: 1px solid var(--border);
+  position: relative;
+  z-index: 100;
 }
 .topbar .title { font-size: 22px; font-weight: 600; }
 .topbar .right { display: flex; align-items: center; gap: 16px; }

@@ -29,7 +29,6 @@ const NAV: Record<string, NavItem[]> = {
     { to: '/admin/finance', label: 'Финансы', icon: Icon.fin },
     { to: '/admin/analytics', label: 'Аналитика', icon: Icon.chart },
     { to: '/admin/system', label: 'Система', icon: Icon.cog },
-    { to: '/notes', label: 'Заметки', icon: Icon.note },
     { to: '/ai', label: 'ИИ-помощник', ai: true },
   ],
   TEACHER: [
@@ -40,7 +39,6 @@ const NAV: Record<string, NavItem[]> = {
     { to: '/teacher/groups', label: 'Группы', icon: Icon.group },
     { to: '/teacher/messages', label: 'Сообщения', icon: Icon.msg },
     { to: '/teacher/finance', label: 'Финансы', icon: Icon.fin },
-    { to: '/notes', label: 'Заметки', icon: Icon.note },
     { to: '/ai', label: 'ИИ-помощник', ai: true },
   ],
   STUDENT: [
@@ -48,7 +46,6 @@ const NAV: Record<string, NavItem[]> = {
     { to: '/student/calendar', label: 'Календарь', icon: Icon.cal },
     { to: '/student/courses', label: 'Курсы', icon: Icon.book },
     { to: '/student/messages', label: 'Сообщения', icon: Icon.msg },
-    { to: '/notes', label: 'Заметки', icon: Icon.note },
     { to: '/ai', label: 'ИИ-помощник', ai: true },
   ],
 };
