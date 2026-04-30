@@ -38,6 +38,10 @@ model User {
   id               String   @id @default(cuid())
   login            String   @unique
   password         String
+  // Plaintext copy of the password for accounts whose credentials are managed
+  // by a teacher (i.e. students). Lets the teacher view/share the credentials
+  // they themselves chose. Only populated on teacher-led account creation.
+  plainPassword    String?
   role             Role
   fullName         String
   email            String?

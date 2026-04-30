@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Shell } from '../../components/Shell';
-import { api, invalidateApi } from '../../api';
+import { api, invalidateApi, mutateCache } from '../../api';
 import { useApi } from '../../hooks';
 import { Modal } from '../../components/Modal';
 import { SkeletonGrid } from '../../components/Skeleton';
@@ -18,12 +18,17 @@ export function TeacherGroups() {
   async function removeGroup(id: string) {
     const ok = await confirmDialog({ title: t('groups.confirmDelete'), danger: true, okLabel: t('btn.delete') });
     if (!ok) return;
+    const prev = list || [];
+    // Optimistic — drop from the list immediately.
+    mutateCache<any[]>('/groups', undefined, (cur) => (cur || []).filter((g) => g.id !== id));
     try {
       await api.delete(`/groups/${id}`);
       invalidateApi('/groups');
       toast.success(t('groups.deleted'));
-      refetch();
-    } catch { toast.error(t('toast.notDeleted')); }
+    } catch {
+      mutateCache<any[]>('/groups', undefined, () => prev);
+      toast.error(t('toast.notDeleted'));
+    }
   }
 
   return (
@@ -60,50 +65,76 @@ export function TeacherGroups() {
         </div>
       )}
 
-      {creating && <GroupForm students={students || []} courses={courses || []} onClose={(saved) => { setCreating(false); if (saved) { invalidateApi('/groups'); refetch(); } }} />}
-      {editing && <GroupForm initial={editing} students={students || []} courses={courses || []} onClose={(saved) => { setEditing(null); if (saved) { invalidateApi('/groups'); refetch(); } }} />}
+      {creating && <GroupForm students={students || []} courses={courses || []} onClose={() => setCreating(false)} onOptimisticSync={() => { invalidateApi('/groups'); refetch(); }} />}
+      {editing && <GroupForm initial={editing} students={students || []} courses={courses || []} onClose={() => setEditing(null)} onOptimisticSync={() => { invalidateApi('/groups'); refetch(); }} />}
     </Shell>
   );
 }
 
-function GroupForm({ initial, students, courses, onClose }: any) {
+function GroupForm({ initial, students, courses, onClose, onOptimisticSync }: any) {
   const { t } = useT();
   const [name, setName] = useState(initial?.name || '');
   const [courseId, setCourseId] = useState(initial?.courseId || '');
   const [members, setMembers] = useState<{ id: string; price: number }[]>(
     initial?.members?.map((m: any) => ({ id: m.studentId || m.student?.id, price: m.pricePerLesson || 0 })) || [],
   );
-  const [saving, setSaving] = useState(false);
 
   function toggle(id: string) {
     if (members.find((m) => m.id === id)) setMembers(members.filter((m) => m.id !== id));
     else setMembers([...members, { id, price: 0 }]);
   }
-  async function save() {
+  function save() {
     if (!name.trim()) { toast.warning(t('groups.fillName')); return; }
     if (members.length === 0) { toast.warning(t('groups.fillMembers')); return; }
-    setSaving(true);
-    try {
-      const body = {
-        name,
-        courseId: courseId || null,
-        members: members.map((m) => ({ studentProfileId: m.id, pricePerLesson: m.price })),
-      };
-      if (initial) {
-        await api.patch(`/groups/${initial.id}`, body);
-        toast.success(t('groups.updated'));
-      } else {
-        await api.post('/groups', body);
-        toast.success(t('groups.created'));
-      }
-      onClose(true);
-    } catch (e: any) { toast.error(e?.response?.data?.message || t('toast.notSaved')); }
-    finally { setSaving(false); }
+    const body = {
+      name,
+      courseId: courseId || null,
+      members: members.map((m) => ({ studentProfileId: m.id, pricePerLesson: m.price })),
+    };
+    const isEdit = !!initial;
+
+    // Optimistic — patch the list cache immediately, close modal, fire request in background.
+    const course = courses.find((c: any) => c.id === courseId) || null;
+    const optimisticGroup = {
+      id: initial?.id || `tmp-${Date.now()}`,
+      name,
+      courseId: courseId || null,
+      course,
+      members: members.map((m) => {
+        const studentProfile = students.find((s: any) => s.id === m.id);
+        return {
+          id: `tmp-${m.id}`,
+          studentId: m.id,
+          student: studentProfile,
+          pricePerLesson: m.price,
+        };
+      }),
+    };
+    let prev: any[] = [];
+    mutateCache<any[]>('/groups', undefined, (cur) => {
+      prev = cur || [];
+      if (isEdit) return (cur || []).map((g) => g.id === initial.id ? { ...g, ...optimisticGroup } : g);
+      return [optimisticGroup, ...(cur || [])];
+    });
+    onClose();
+
+    const req = isEdit ? api.patch(`/groups/${initial.id}`, body) : api.post('/groups', body);
+    req
+      .then(() => {
+        toast.success(isEdit ? t('groups.updated') : t('groups.created'));
+        onOptimisticSync?.();
+      })
+      .catch((e: any) => {
+        // Rollback to previous list state.
+        mutateCache<any[]>('/groups', undefined, () => prev);
+        onOptimisticSync?.();
+        toast.error(e?.response?.data?.message || t('toast.notSaved'));
+      });
   }
 
   return (
-    <Modal open onClose={() => onClose(false)} title={initial ? t('groups.editGroup') : t('groups.newGroup')} width={520}
-      footer={<><button className="btn" onClick={() => onClose(false)}>{t('btn.cancel')}</button><button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? t('status.saving') : (initial ? t('btn.save') : t('btn.create'))}</button></>}>
+    <Modal open onClose={onClose} title={initial ? t('groups.editGroup') : t('groups.newGroup')} width={520}
+      footer={<><button className="btn" onClick={onClose}>{t('btn.cancel')}</button><button className="btn btn-primary" onClick={save}>{initial ? t('btn.save') : t('btn.create')}</button></>}>
       <div className="field"><label>{t('groups.name')}</label><input className="input" value={name} onChange={(e) => setName(e.target.value)} autoFocus /></div>
       <div className="field"><label>{t('groups.course')}</label>
         <select className="select" value={courseId} onChange={(e) => setCourseId(e.target.value)}>

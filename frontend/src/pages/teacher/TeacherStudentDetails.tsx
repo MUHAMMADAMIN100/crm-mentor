@@ -82,12 +82,11 @@ export function TeacherStudentDetails() {
       setTopping(false);
     }
   }
-  async function openChat() {
+  function openChat() {
     if (!s) return;
-    try {
-      await api.post(`/chat/private/${s.userId}`);
-      nav('/teacher/messages');
-    } catch { toast.error(t('chat.notOpened')); }
+    // Navigate immediately — chat creation is idempotent and runs in background.
+    nav('/teacher/messages');
+    api.post(`/chat/private/${s.userId}`).catch(() => toast.error(t('chat.notOpened')));
   }
 
   if (!s) return <Shell title={t('students.title')}><Loading label={t('loader.profile')} /></Shell>;
@@ -181,7 +180,18 @@ export function TeacherStudentDetails() {
       <StudentCalendarCard student={s} />
 
       {editProfileOpen && (
-        <EditProfileModal student={s} onClose={(saved: boolean) => { setEditProfileOpen(false); if (saved) load(); }} />
+        <EditProfileModal
+          student={s}
+          onSaved={(updatedUser: any) => {
+            // Optimistic merge — UI updates instantly while the request flies.
+            setS((cur: any) => cur ? { ...cur, user: { ...cur.user, ...updatedUser } } : cur);
+          }}
+          onRollback={(prevUser: any) => {
+            // Request failed — restore the old user fields.
+            setS((cur: any) => cur ? { ...cur, user: prevUser } : cur);
+          }}
+          onClose={() => setEditProfileOpen(false)}
+        />
       )}
     </Shell>
   );
@@ -196,11 +206,13 @@ function ProfRow({ label, value }: { label: string; value?: string | null }) {
   );
 }
 
-function EditProfileModal({ student, onClose }: any) {
+function EditProfileModal({ student, onClose, onSaved, onRollback }: any) {
   const { t } = useT();
   const u = student.user || {};
   const [form, setForm] = useState({
     fullName: u.fullName || '',
+    login: u.login || '',
+    password: u.plainPassword || '',
     email: u.email || '',
     phone: u.phone || '',
     telegram: u.telegram || '',
@@ -210,38 +222,56 @@ function EditProfileModal({ student, onClose }: any) {
     city: u.city || '',
     goal: u.goal || '',
     bio: u.bio || '',
-    password: '',
   });
-  const [saving, setSaving] = useState(false);
   function up(k: string, v: any) { setForm((f) => ({ ...f, [k]: v })); }
 
-  async function save() {
-    setSaving(true);
-    try {
-      const payload: any = { ...form };
-      if (!payload.password) delete payload.password;
-      await api.patch(`/students/${student.id}/profile`, payload);
-      toast.success(t('profile.updated'));
-      onClose(true);
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message || t('toast.notSaved'));
-    } finally { setSaving(false); }
+  function save() {
+    const payload: any = { ...form };
+    // Only send password/login when they actually changed.
+    if (!payload.password || payload.password === (u.plainPassword || '')) delete payload.password;
+    if (!payload.login || payload.login.trim() === (u.login || '')) delete payload.login;
+
+    // Optimistic merge — apply locally, then close immediately. Request runs in background.
+    const optimisticUser = {
+      ...u,
+      fullName: form.fullName,
+      login: form.login || u.login,
+      plainPassword: form.password || u.plainPassword,
+      email: form.email,
+      phone: form.phone,
+      telegram: form.telegram,
+      whatsapp: form.whatsapp,
+      instagram: form.instagram,
+      website: form.website,
+      city: form.city,
+      goal: form.goal,
+      bio: form.bio,
+    };
+    onSaved?.(optimisticUser);
+    onClose();
+
+    api.patch(`/students/${student.id}/profile`, payload)
+      .then(() => toast.success(t('profile.updated')))
+      .catch((e: any) => {
+        onRollback?.(u);
+        toast.error(e?.response?.data?.message || t('toast.notSaved'));
+      });
   }
 
   return (
-    <Modal open onClose={() => onClose(false)} title={t('profile.editBtn')} width={920}
-      footer={<><button className="btn" onClick={() => onClose(false)}>{t('btn.cancel')}</button><button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? t('status.saving') : t('profile.saveBtn')}</button></>}>
+    <Modal open onClose={onClose} title={t('profile.editBtn')} width={920}
+      footer={<><button className="btn" onClick={onClose}>{t('btn.cancel')}</button><button className="btn btn-primary" onClick={save}>{t('profile.saveBtn')}</button></>}>
       <div className="modal-form-2col">
         <section>
           <h4 className="modal-section-title">{t('students.profile')}</h4>
           <div className="field"><label>{t('profile.fullName')}</label><input className="input" value={form.fullName} onChange={(e) => up('fullName', e.target.value)} /></div>
+          <div className="field"><label>{t('profile.login')}</label><input className="input" value={form.login} onChange={(e) => up('login', e.target.value)} /></div>
+          <div className="field"><label>{t('auth.password')}</label>
+            <input className="input" type="text" value={form.password} onChange={(e) => up('password', e.target.value)} />
+          </div>
           <div className="field"><label>{t('profile.city')}</label><input className="input" value={form.city} onChange={(e) => up('city', e.target.value)} /></div>
           <div className="field"><label>{t('profile.goal')}</label><input className="input" value={form.goal} onChange={(e) => up('goal', e.target.value)} /></div>
           <div className="field"><label>{t('profile.bio')}</label><textarea className="textarea" value={form.bio} onChange={(e) => up('bio', e.target.value)} /></div>
-          <div className="h-divider" />
-          <div className="field"><label>{t('auth.passwordNew')} ({t('common.optional')})</label>
-            <input className="input" type="text" value={form.password} onChange={(e) => up('password', e.target.value)} placeholder="оставьте пустым чтобы не менять" />
-          </div>
         </section>
 
         <section>
@@ -352,43 +382,83 @@ function StudentCalendarCard({ student }: { student: any }) {
       )}
 
       {pickedDay && creatingLesson && (
-        <LessonMini day={pickedDay} student={student} onClose={(saved: boolean) => { setPickedDay(null); setCreatingLesson(false); if (saved) load(); }} />
+        <LessonMini
+          day={pickedDay}
+          student={student}
+          onClose={() => { setPickedDay(null); setCreatingLesson(false); }}
+          onOptimistic={(payload: any) => {
+            const tempId = `tmp-${Date.now()}`;
+            const optimistic = {
+              id: tempId,
+              type: 'INDIVIDUAL',
+              studentProfileId: student.id,
+              status: 'PLANNED',
+              ...payload,
+              __optimistic: true,
+            };
+            setData((d: any) => ({ ...d, lessons: [...d.lessons, optimistic] }));
+            api.post('/calendar/lessons', payload)
+              .then((r) => {
+                setData((d: any) => ({
+                  ...d,
+                  lessons: d.lessons.map((x: any) => x.id === tempId ? r.data : x),
+                }));
+                toast.success(t('calendar.lessonCreated'));
+              })
+              .catch(() => {
+                setData((d: any) => ({ ...d, lessons: d.lessons.filter((x: any) => x.id !== tempId) }));
+                toast.error(t('toast.notCreated'));
+              });
+          }}
+        />
       )}
 
       {pickedEvent && pickedEvent.id.startsWith('L') && (
         <LessonInfo
           lesson={data.lessons.find((l: any) => 'L' + l.id === pickedEvent.id)}
-          onClose={(refresh: boolean) => { setPickedEvent(null); if (refresh) load(); }}
+          onOptimisticDelete={(id: string) => {
+            const prev = data;
+            setData((d: any) => ({ ...d, lessons: d.lessons.filter((x: any) => x.id !== id) }));
+            api.delete(`/calendar/lessons/${id}`)
+              .then(() => toast.success(t('calendar.lessonDeleted')))
+              .catch(() => { setData(prev); toast.error(t('toast.notDeleted')); });
+          }}
+          onOptimisticComplete={(id: string) => {
+            const prev = data;
+            setData((d: any) => ({
+              ...d,
+              lessons: d.lessons.map((x: any) => x.id === id ? { ...x, status: 'COMPLETED' } : x),
+            }));
+            api.post(`/calendar/lessons/${id}/complete`)
+              .then(() => { toast.success(t('calendar.lessonCompleted')); load(); })
+              .catch((e: any) => { setData(prev); toast.error(e?.response?.data?.message || t('toast.error')); });
+          }}
+          onClose={() => setPickedEvent(null)}
         />
       )}
     </div>
   );
 }
 
-function LessonMini({ day, student, onClose }: any) {
+function LessonMini({ day, student, onClose, onOptimistic }: any) {
   const { t } = useT();
   const [form, setForm] = useState({ timeFrom: '12:00', timeTo: '13:00', link: '', comment: '' });
-  const [saving, setSaving] = useState(false);
-  async function save() {
+  function save() {
     const dt = combineDayTime(day, form.timeFrom);
     const durationMin = durationFromTimes(form.timeFrom, form.timeTo);
-    setSaving(true);
-    try {
-      await api.post('/calendar/lessons', {
-        type: 'INDIVIDUAL',
-        studentProfileId: student.id,
-        startAt: dt.toISOString(),
-        durationMin,
-        link: form.link || null,
-        comment: form.comment || null,
-      });
-      toast.success(t('calendar.lessonCreated'));
-      onClose(true);
-    } catch { toast.error(t('toast.notCreated')); } finally { setSaving(false); }
+    onClose();
+    onOptimistic?.({
+      type: 'INDIVIDUAL',
+      studentProfileId: student.id,
+      startAt: dt.toISOString(),
+      durationMin,
+      link: form.link || null,
+      comment: form.comment || null,
+    });
   }
   return (
-    <Modal open onClose={() => onClose(false)} title={t('calendar.lessonNew')}
-      footer={<><button className="btn" onClick={() => onClose(false)}>{t('btn.cancel')}</button><button className="btn btn-primary" onClick={save} disabled={saving}>{t('btn.create')}</button></>}>
+    <Modal open onClose={onClose} title={t('calendar.lessonNew')}
+      footer={<><button className="btn" onClick={onClose}>{t('btn.cancel')}</button><button className="btn btn-primary" onClick={save}>{t('btn.create')}</button></>}>
       <p className="muted" style={{ marginTop: 0 }}>{t('calendar.student')}: <strong>{student.user.fullName}</strong></p>
       <div className="row">
         <div className="field"><label>{t('calendar.timeFrom')}</label><input className="input" type="time" value={form.timeFrom} onChange={(e) => setForm({ ...form, timeFrom: e.target.value })} /></div>
@@ -400,27 +470,21 @@ function LessonMini({ day, student, onClose }: any) {
   );
 }
 
-function LessonInfo({ lesson, onClose }: any) {
+function LessonInfo({ lesson, onClose, onOptimisticDelete, onOptimisticComplete }: any) {
   const { t } = useT();
   if (!lesson) return null;
-  async function complete() {
-    try {
-      await api.post(`/calendar/lessons/${lesson.id}/complete`);
-      toast.success(t('calendar.lessonCompleted'));
-      onClose(true);
-    } catch (e: any) { toast.error(e?.response?.data?.message || t('toast.error')); }
+  function complete() {
+    onClose();
+    onOptimisticComplete?.(lesson.id);
   }
   async function del() {
     const ok = await confirmDialog({ title: t('calendar.confirmDelete'), body: t('calendar.confirmDeleteBody'), danger: true, okLabel: t('btn.delete') });
     if (!ok) return;
-    try {
-      await api.delete(`/calendar/lessons/${lesson.id}`);
-      toast.success(t('calendar.lessonDeleted'));
-      onClose(true);
-    } catch { toast.error(t('toast.notDeleted')); }
+    onClose();
+    onOptimisticDelete?.(lesson.id);
   }
   return (
-    <Modal open onClose={() => onClose(false)} title={t('calendar.lesson')}>
+    <Modal open onClose={onClose} title={t('calendar.lesson')}>
       <p>{new Date(lesson.startAt).toLocaleString()} · {lesson.durationMin} {t('misc.duration60')}</p>
       <p className="muted">{t('calendar.status')}: {t(`lesson.${lesson.status}` as any) || lesson.status}</p>
       {lesson.link && <p>{t('calendar.linkLabel')}: <a href={lesson.link} target="_blank" rel="noreferrer">{lesson.link}</a></p>}

@@ -300,24 +300,20 @@ function LessonForm({ day, students, groups, onClose, initial }: any) {
   const { t } = useT();
   const init = initial || { type: 'INDIVIDUAL', studentProfileId: '', groupId: '', timeFrom: '12:00', timeTo: '13:00', link: '', comment: '' };
   const [form, setForm] = useState(init);
-  const [saving, setSaving] = useState(false);
-  async function save() {
+  function save() {
     if (form.type === 'INDIVIDUAL' && !form.studentProfileId) { toast.warning(t('calendar.student')); return; }
     if (form.type === 'GROUP' && !form.groupId) { toast.warning(t('calendar.group')); return; }
     const dt = combineDayTime(day, form.timeFrom);
     const durationMin = durationFromTimes(form.timeFrom, form.timeTo);
-    setSaving(true);
-    try {
-      if (initial && initial.id) {
-        await api.patch(`/calendar/lessons/${initial.id}`, {
+    onClose(true);
+    const req = initial && initial.id
+      ? api.patch(`/calendar/lessons/${initial.id}`, {
           startAt: dt.toISOString(),
           durationMin,
           link: form.link || null,
           comment: form.comment || null,
-        });
-        toast.success(t('course.lessonSaved'));
-      } else {
-        await api.post('/calendar/lessons', {
+        })
+      : api.post('/calendar/lessons', {
           type: form.type,
           studentProfileId: form.type === 'INDIVIDUAL' ? form.studentProfileId : null,
           groupId: form.type === 'GROUP' ? form.groupId : null,
@@ -325,16 +321,13 @@ function LessonForm({ day, students, groups, onClose, initial }: any) {
           durationMin,
           link: form.link, comment: form.comment,
         });
-        toast.success(t('calendar.lessonCreated'));
-      }
-      onClose(true);
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message || t('toast.notCreated'));
-    } finally { setSaving(false); }
+    req
+      .then(() => toast.success(initial ? t('course.lessonSaved') : t('calendar.lessonCreated')))
+      .catch((e: any) => toast.error(e?.response?.data?.message || t('toast.notCreated')));
   }
   return (
     <Modal open onClose={() => onClose(false)} title={initial ? t('course.lessonEdit') : t('calendar.lessonNew')}
-      footer={<><button className="btn" onClick={() => onClose(false)}>{t('btn.cancel')}</button><button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? t('status.saving') : (initial ? t('btn.save') : t('btn.create'))}</button></>}>
+      footer={<><button className="btn" onClick={() => onClose(false)}>{t('btn.cancel')}</button><button className="btn btn-primary" onClick={save}>{initial ? t('btn.save') : t('btn.create')}</button></>}>
       {!initial && (
         <div className="field"><label>{t('calendar.type')}</label>
           <select className="select" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
@@ -383,26 +376,20 @@ function FreeSlotForm({ day, onClose, initial }: any) {
   const init = initial || { timeFrom: '12:00', timeTo: '13:00' };
   const [timeFrom, setTimeFrom] = useState(init.timeFrom);
   const [timeTo, setTimeTo] = useState(init.timeTo);
-  const [saving, setSaving] = useState(false);
-  async function save() {
+  function save() {
     const dt = combineDayTime(day, timeFrom);
     const durationMin = durationFromTimes(timeFrom, timeTo);
-    setSaving(true);
-    try {
-      if (initial && initial.id) {
-        await api.patch(`/calendar/free-slots/${initial.id}`, { startAt: dt.toISOString(), durationMin });
-      } else {
-        await api.post('/calendar/free-slots', { startAt: dt.toISOString(), durationMin });
-      }
-      toast.success(initial ? t('btn.save') : t('calendar.slotCreated'));
-      onClose(true);
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message || t('toast.notCreated'));
-    } finally { setSaving(false); }
+    onClose(true);
+    const req = initial && initial.id
+      ? api.patch(`/calendar/free-slots/${initial.id}`, { startAt: dt.toISOString(), durationMin })
+      : api.post('/calendar/free-slots', { startAt: dt.toISOString(), durationMin });
+    req
+      .then(() => toast.success(initial ? t('btn.save') : t('calendar.slotCreated')))
+      .catch((e: any) => toast.error(e?.response?.data?.message || t('toast.notCreated')));
   }
   return (
     <Modal open onClose={() => onClose(false)} title={t('calendar.free')}
-      footer={<><button className="btn" onClick={() => onClose(false)}>{t('btn.cancel')}</button><button className="btn btn-primary" onClick={save} disabled={saving}>{initial ? t('btn.save') : t('btn.create')}</button></>}>
+      footer={<><button className="btn" onClick={() => onClose(false)}>{t('btn.cancel')}</button><button className="btn btn-primary" onClick={save}>{initial ? t('btn.save') : t('btn.create')}</button></>}>
       <div className="row">
         <div className="field"><label>{t('calendar.timeFrom')}</label><input className="input" type="time" value={timeFrom} onChange={(e) => setTimeFrom(e.target.value)} /></div>
         <div className="field"><label>{t('calendar.timeTo')}</label><input className="input" type="time" value={timeTo} onChange={(e) => setTimeTo(e.target.value)} /></div>
@@ -415,30 +402,25 @@ function EventForm({ day, onClose, initial }: any) {
   const { t } = useT();
   const init = initial || { title: '', timeFrom: '12:00', timeTo: '13:00', reminder: false, description: '' };
   const [form, setForm] = useState(init);
-  const [saving, setSaving] = useState(false);
-  async function save() {
+  function save() {
     if (!form.title.trim()) { toast.warning(t('groups.fillName')); return; }
     const dt = combineDayTime(day, form.timeFrom);
-    setSaving(true);
-    try {
-      if (initial && initial.id) {
-        await api.patch(`/calendar/events/${initial.id}`, {
+    onClose(true);
+    const req = initial && initial.id
+      ? api.patch(`/calendar/events/${initial.id}`, {
           title: form.title,
           startAt: dt.toISOString(),
           reminder: form.reminder,
           description: form.description,
-        });
-        toast.success(t('btn.save'));
-      } else {
-        await api.post('/calendar/events', { ...form, startAt: dt.toISOString() });
-        toast.success(t('calendar.eventCreated'));
-      }
-      onClose(true);
-    } catch { toast.error(t('toast.notSaved')); } finally { setSaving(false); }
+        })
+      : api.post('/calendar/events', { ...form, startAt: dt.toISOString() });
+    req
+      .then(() => toast.success(initial ? t('btn.save') : t('calendar.eventCreated')))
+      .catch(() => toast.error(t('toast.notSaved')));
   }
   return (
     <Modal open onClose={() => onClose(false)} title={t('calendar.event')}
-      footer={<><button className="btn" onClick={() => onClose(false)}>{t('btn.cancel')}</button><button className="btn btn-primary" onClick={save} disabled={saving}>{initial ? t('btn.save') : t('btn.create')}</button></>}>
+      footer={<><button className="btn" onClick={() => onClose(false)}>{t('btn.cancel')}</button><button className="btn btn-primary" onClick={save}>{initial ? t('btn.save') : t('btn.create')}</button></>}>
       <div className="field"><label>{t('calendar.title2')}</label><input className="input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
       <div className="row">
         <div className="field"><label>{t('calendar.timeFrom')}</label><input className="input" type="time" value={form.timeFrom} onChange={(e) => setForm({ ...form, timeFrom: e.target.value })} /></div>

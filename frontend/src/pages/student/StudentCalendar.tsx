@@ -129,25 +129,21 @@ function EventForm({ day, onClose, initial }: any) {
   const init = initial || { title: '', time: '12:00' };
   const [title, setTitle] = useState(init.title);
   const [time, setTime] = useState(init.time);
-  const [saving, setSaving] = useState(false);
-  async function save() {
+  function save() {
     if (!title.trim()) { toast.warning(t('groups.fillName')); return; }
     const [hh, mm] = time.split(':').map(Number);
     const dt = new Date(day); dt.setHours(hh, mm, 0, 0);
-    setSaving(true);
-    try {
-      if (initial && initial.id) {
-        await api.patch(`/calendar/events/${initial.id}`, { title, startAt: dt.toISOString() });
-      } else {
-        await api.post('/calendar/events', { title, startAt: dt.toISOString() });
-      }
-      toast.success(initial ? t('btn.save') : t('calendar.eventCreated'));
-      onClose(true);
-    } catch { toast.error(t('toast.notSaved')); } finally { setSaving(false); }
+    onClose(true);
+    const req = initial && initial.id
+      ? api.patch(`/calendar/events/${initial.id}`, { title, startAt: dt.toISOString() })
+      : api.post('/calendar/events', { title, startAt: dt.toISOString() });
+    req
+      .then(() => toast.success(initial ? t('btn.save') : t('calendar.eventCreated')))
+      .catch(() => toast.error(t('toast.notSaved')));
   }
   return (
     <Modal open onClose={() => onClose(false)} title={t('calendar.event')}
-      footer={<><button className="btn" onClick={() => onClose(false)}>{t('btn.cancel')}</button><button className="btn btn-primary" onClick={save} disabled={saving}>{initial ? t('btn.save') : t('btn.create')}</button></>}>
+      footer={<><button className="btn" onClick={() => onClose(false)}>{t('btn.cancel')}</button><button className="btn btn-primary" onClick={save}>{initial ? t('btn.save') : t('btn.create')}</button></>}>
       <div className="field"><label>{t('calendar.title2')}</label><input className="input" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus /></div>
       <div className="field"><label>{t('calendar.time')}</label><input className="input" type="time" value={time} onChange={(e) => setTime(e.target.value)} /></div>
     </Modal>
@@ -165,14 +161,11 @@ function RescheduleModal({ lesson, onClose }: any) {
       .finally(() => setLoading(false));
   }, [lesson]);
   if (!lesson) return null;
-  async function reschedule(slotId: string) {
-    try {
-      await api.post('/calendar/student/reschedule', { lessonId: lesson.id, freeSlotId: slotId });
-      toast.success(t('calendar.rescheduled'));
-      onClose();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message || t('calendar.lessonCantReschedule'));
-    }
+  function reschedule(slotId: string) {
+    onClose();
+    api.post('/calendar/student/reschedule', { lessonId: lesson.id, freeSlotId: slotId })
+      .then(() => toast.success(t('calendar.rescheduled')))
+      .catch((e: any) => toast.error(e?.response?.data?.message || t('calendar.lessonCantReschedule')));
   }
   return (
     <Modal open onClose={onClose} title={t('calendar.lesson')}>

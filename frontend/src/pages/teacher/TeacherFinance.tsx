@@ -19,14 +19,21 @@ export function TeacherFinance() {
   const [generating, setGenerating] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
 
-  async function saveCurrency() {
-    try {
-      await api.patch('/teacher/currency', { currency });
-      invalidateApi('/finance/teacher');
-      await refreshMe();
-      toast.success(t('finance.currencyUpdated'));
-      load();
-    } catch { toast.error(t('finance.currencyErr')); }
+  function saveCurrency() {
+    // UI already reflects the new currency via the `currency` local state.
+    // Fire the request in the background and only roll back on failure.
+    const prev = (user as any)?.teacherCurrency || 'RUB';
+    toast.success(t('finance.currencyUpdated'));
+    api.patch('/teacher/currency', { currency })
+      .then(() => {
+        invalidateApi('/finance/teacher');
+        refreshMe();
+        load();
+      })
+      .catch(() => {
+        setCurrency(prev);
+        toast.error(t('finance.currencyErr'));
+      });
   }
 
   const periodMs = useMemo(() => {

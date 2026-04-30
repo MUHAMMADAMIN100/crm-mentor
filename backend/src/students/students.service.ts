@@ -29,6 +29,9 @@ export class StudentsService {
       data: {
         login: data.login,
         password: hash,
+        // Teacher chose this password and may need to share it with the student
+        // again later — keep a plaintext copy.
+        plainPassword: data.password,
         role: 'STUDENT',
         fullName: data.fullName,
         // Teacher sets a permanent password right away — no forced reset on first login.
@@ -113,10 +116,21 @@ export class StudentsService {
   async updateStudentProfile(teacherId: string, profileId: string, data: any) {
     const sp = await this.prisma.studentProfile.findUnique({ where: { id: profileId } });
     if (!sp || sp.teacherId !== teacherId) throw new ForbiddenException();
+
+    // If teacher wants to change the login, make sure it's not taken by another user.
+    if (data.login && data.login.trim()) {
+      const taken = await this.prisma.user.findFirst({
+        where: { login: data.login.trim(), NOT: { id: sp.userId } },
+        select: { id: true },
+      });
+      if (taken) throw new BadRequestException('Логин уже занят');
+    }
+
     const updated = await this.prisma.user.update({
       where: { id: sp.userId },
       data: {
         fullName: data.fullName ?? undefined,
+        login: data.login?.trim() || undefined,
         email: data.email ?? undefined,
         phone: data.phone ?? undefined,
         telegram: data.telegram ?? undefined,
@@ -126,7 +140,13 @@ export class StudentsService {
         city: data.city ?? undefined,
         goal: data.goal ?? undefined,
         bio: data.bio ?? undefined,
-        ...(data.password ? { password: await AuthService.hashPassword(data.password), mustChangePassword: false } : {}),
+        ...(data.password
+          ? {
+              password: await AuthService.hashPassword(data.password),
+              plainPassword: data.password,
+              mustChangePassword: false,
+            }
+          : {}),
       },
     });
     const { password, ...rest } = updated as any;

@@ -48,7 +48,6 @@ export function ChatPanel({ autoOpenWithUserId }: Props = {}) {
   const [messages, setMessages] = useState<any[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [text, setText] = useState('');
-  const [opening, setOpening] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const loadChats = useCallback(() => {
@@ -63,15 +62,13 @@ export function ChatPanel({ autoOpenWithUserId }: Props = {}) {
 
   // Auto-open one-click chat with teacher/student
   useEffect(() => {
-    if (!autoOpenWithUserId || !user || opening) return;
-    setOpening(true);
+    if (!autoOpenWithUserId || !user) return;
     api.post(`/chat/private/${autoOpenWithUserId}`)
       .then(async (r) => {
         await loadChats();
         setActive(r.data.id);
       })
-      .catch(() => toast.error(t('chat.notOpened')))
-      .finally(() => setOpening(false));
+      .catch(() => toast.error(t('chat.notOpened')));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOpenWithUserId, user]);
 
@@ -241,7 +238,7 @@ export function ChatPanel({ autoOpenWithUserId }: Props = {}) {
           </>
         ) : (
           <div className="empty" style={{ margin: 'auto' }}>
-            {opening ? t('status.opening') : t('empty.selectChat')}
+            {t('empty.selectChat')}
           </div>
         )}
       </div>

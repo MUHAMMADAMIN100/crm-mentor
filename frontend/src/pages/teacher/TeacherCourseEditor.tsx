@@ -57,11 +57,21 @@ export function TeacherCourseEditor() {
       </div>
 
       {accessOpen && (
-        <AccessModal courseId={course.id} accesses={course.accesses} students={students} onClose={() => { setAccessOpen(false); load(); }} />
+        <AccessModal
+          courseId={course.id}
+          accesses={course.accesses}
+          students={students}
+          onClose={() => setAccessOpen(false)}
+          onChanged={load}
+        />
       )}
 
       {editingLesson && (
-        <LessonEditor lesson={editingLesson} onClose={() => { setEditingLesson(null); load(); }} />
+        <LessonEditor
+          lesson={editingLesson}
+          onClose={() => setEditingLesson(null)}
+          onChanged={load}
+        />
       )}
 
       {adding?.kind === 'module' && (
@@ -143,26 +153,25 @@ function SimpleNameModal({ title, placeholder, onClose }: any) {
   );
 }
 
-function AccessModal({ courseId, accesses, students, onClose }: any) {
+function AccessModal({ courseId, accesses, students, onClose, onChanged }: any) {
   const { t } = useT();
   const [picked, setPicked] = useState<string[]>([]);
   const [paid, setPaid] = useState(false);
   const [expiresAt, setExpiresAt] = useState('');
-  async function grant() {
-    try {
-      await api.post(`/courses/${courseId}/access`, { studentProfileIds: picked, paid, expiresAt: expiresAt || undefined });
-      toast.success(t('course.access.granted'));
-      onClose();
-    } catch { toast.error(t('toast.notSaved')); }
+  function grant() {
+    if (picked.length === 0) return;
+    onClose();
+    api.post(`/courses/${courseId}/access`, { studentProfileIds: picked, paid, expiresAt: expiresAt || undefined })
+      .then(() => { toast.success(t('course.access.granted')); onChanged?.(); })
+      .catch(() => toast.error(t('toast.notSaved')));
   }
   async function revoke(sid: string) {
     const ok = await confirmDialog({ title: t('course.access.confirmRevoke'), danger: true, okLabel: t('course.access.closeBtn') });
     if (!ok) return;
-    try {
-      await api.delete(`/courses/${courseId}/access/${sid}`);
-      toast.success(t('course.access.revoked'));
-      onClose();
-    } catch { toast.error(t('toast.notDeleted')); }
+    onClose();
+    api.delete(`/courses/${courseId}/access/${sid}`)
+      .then(() => { toast.success(t('course.access.revoked')); onChanged?.(); })
+      .catch(() => toast.error(t('toast.notDeleted')));
   }
   return (
     <Modal open onClose={onClose} title={t('course.accessTitle')} width={560}
@@ -196,7 +205,7 @@ function AccessModal({ courseId, accesses, students, onClose }: any) {
   );
 }
 
-function LessonEditor({ lesson, onClose }: any) {
+function LessonEditor({ lesson, onClose, onChanged }: any) {
   const { t } = useT();
   const [data, setData] = useState({
     title: lesson.title,
@@ -208,55 +217,70 @@ function LessonEditor({ lesson, onClose }: any) {
   const [blocks, setBlocks] = useState<any[]>(lesson.blocks || []);
   const [addingType, setAddingType] = useState<string | null>(null);
   const [editingBlock, setEditingBlock] = useState<any | null>(null);
-  const [saving, setSaving] = useState(false);
 
-  async function saveLesson() {
-    setSaving(true);
-    try {
-      await api.patch(`/courses/lessons/${lesson.id}`, {
-        ...data,
-        deadlineAt: data.deadlineMode === 'MANUAL' && data.deadlineAt ? new Date(data.deadlineAt).toISOString() : null,
+  function saveLesson() {
+    onClose();
+    api.patch(`/courses/lessons/${lesson.id}`, {
+      ...data,
+      deadlineAt: data.deadlineMode === 'MANUAL' && data.deadlineAt ? new Date(data.deadlineAt).toISOString() : null,
+    })
+      .then(() => { toast.success(t('course.lessonSaved')); onChanged?.(); })
+      .catch(() => toast.error(t('toast.notSaved')));
+  }
+  function addBlock(type: string, payload: any) {
+    const tempId = `tmp-${Date.now()}`;
+    const optimistic = { id: tempId, type, ...payload, __optimistic: true };
+    setBlocks((prev) => [...prev, optimistic]);
+    setAddingType(null);
+    api.post(`/courses/lessons/${lesson.id}/blocks`, { type, ...payload })
+      .then((b) => {
+        setBlocks((prev) => prev.map((x) => x.id === tempId ? b.data : x));
+        toast.success(t('course.blockAdded'));
+      })
+      .catch(() => {
+        setBlocks((prev) => prev.filter((x) => x.id !== tempId));
+        toast.error(t('toast.notCreated'));
       });
-      toast.success(t('course.lessonSaved'));
-      onClose();
-    } catch { toast.error(t('toast.notSaved')); } finally { setSaving(false); }
   }
-  async function addBlock(type: string, payload: any) {
-    try {
-      const b = await api.post(`/courses/lessons/${lesson.id}/blocks`, { type, ...payload });
-      setBlocks([...blocks, b.data]);
-      setAddingType(null);
-      toast.success(t('course.blockAdded'));
-    } catch { toast.error(t('toast.notCreated')); }
-  }
-  async function updateBlock(blockId: string, payload: any) {
-    try {
-      const b = await api.patch(`/courses/blocks/${blockId}`, payload);
-      setBlocks(blocks.map((x) => x.id === blockId ? b.data : x));
-      setEditingBlock(null);
-      toast.success(t('btn.save'));
-    } catch { toast.error(t('toast.notSaved')); }
+  function updateBlock(blockId: string, payload: any) {
+    const prev = blocks.find((x) => x.id === blockId);
+    setBlocks((cur) => cur.map((x) => x.id === blockId ? { ...x, ...payload } : x));
+    setEditingBlock(null);
+    api.patch(`/courses/blocks/${blockId}`, payload)
+      .then((b) => {
+        setBlocks((cur) => cur.map((x) => x.id === blockId ? b.data : x));
+        toast.success(t('btn.save'));
+      })
+      .catch(() => {
+        if (prev) setBlocks((cur) => cur.map((x) => x.id === blockId ? prev : x));
+        toast.error(t('toast.notSaved'));
+      });
   }
   async function deleteBlock(bid: string) {
     const ok = await confirmDialog({ title: t('course.confirmDeleteBlock'), danger: true, okLabel: t('btn.delete') });
     if (!ok) return;
-    try {
-      await api.delete(`/courses/blocks/${bid}`);
-      setBlocks(blocks.filter((x) => x.id !== bid));
-      toast.success(t('course.blockDeleted'));
-    } catch { toast.error(t('toast.notDeleted')); }
+    const prev = blocks;
+    setBlocks(blocks.filter((x) => x.id !== bid));
+    api.delete(`/courses/blocks/${bid}`)
+      .then(() => toast.success(t('course.blockDeleted')))
+      .catch(() => {
+        setBlocks(prev);
+        toast.error(t('toast.notDeleted'));
+      });
   }
-  async function toggleBlockHomework(b: any) {
-    try {
-      await api.patch(`/courses/blocks/${b.id}`, { isHomework: !b.isHomework });
-      setBlocks(blocks.map((x) => x.id === b.id ? { ...x, isHomework: !x.isHomework } : x));
-    } catch { toast.error(t('toast.notUpdated')); }
+  function toggleBlockHomework(b: any) {
+    setBlocks((cur) => cur.map((x) => x.id === b.id ? { ...x, isHomework: !x.isHomework } : x));
+    api.patch(`/courses/blocks/${b.id}`, { isHomework: !b.isHomework })
+      .catch(() => {
+        setBlocks((cur) => cur.map((x) => x.id === b.id ? { ...x, isHomework: b.isHomework } : x));
+        toast.error(t('toast.notUpdated'));
+      });
   }
 
   return (
     <>
       <Modal open onClose={onClose} title={t('course.lessonEdit')} width={680}
-        footer={<><button className="btn" onClick={onClose}>{t('btn.close')}</button><button className="btn btn-primary" onClick={saveLesson} disabled={saving}>{saving ? t('status.saving') : t('btn.save')}</button></>}>
+        footer={<><button className="btn" onClick={onClose}>{t('btn.close')}</button><button className="btn btn-primary" onClick={saveLesson}>{t('btn.save')}</button></>}>
         <div className="field"><label>{t('course.title2')}</label><input className="input" value={data.title} onChange={(e) => setData({ ...data, title: e.target.value })} /></div>
         <div className="row">
           <div className="field"><label><input type="checkbox" checked={data.isHomework} onChange={(e) => setData({ ...data, isHomework: e.target.checked })} /> {t('course.isHomework')}</label></div>
