@@ -602,6 +602,31 @@ main.content { max-width: 100%; overflow-x: hidden; }
   .course-shell { grid-template-columns: 1fr !important; }
   .chat-shell { grid-template-columns: 1fr !important; }
 
+  /* Cards never overflow their grid track horizontally; if a table inside
+     is wider than the card, the card scrolls horizontally so the user
+     can reach the last column instead of it being clipped off-screen. */
+  .card { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .card > * { min-width: 0; }
+  .card .table {
+    display: table;
+    width: 100%;
+    min-width: max-content;
+    white-space: nowrap;
+  }
+
+  /* Stat / toolbar items must never push beyond their grid track */
+  .fin-stats { grid-template-columns: 1fr !important; }
+  .fin-stats > * { min-width: 0; max-width: 100%; }
+  .fin-stat .value { word-break: break-word; overflow-wrap: anywhere; }
+  .fin-stat .sub  { word-break: break-word; overflow-wrap: anywhere; }
+  .fin-stat .label { min-width: 0; }
+  .fin-toolbar { max-width: 100%; }
+  .fin-toolbar > * { max-width: 100%; min-width: 0; }
+  .fin-bars { max-width: 100%; }
+
+  /* Empty state text wrapping */
+  .empty { overflow-wrap: anywhere; word-break: break-word; }
+
   .topbar .title { font-size: 17px; }
   .topbar { padding: 11px 14px; gap: 8px; }
   .topbar .right { gap: 10px; }
