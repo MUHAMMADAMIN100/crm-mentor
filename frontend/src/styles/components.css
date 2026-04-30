@@ -899,10 +899,16 @@ main.content { max-width: 100%; overflow-x: hidden; }
   .group-card, .group-members,
   .notes-card,
   .pdf-preview-modal,
-  .auth-card, .auth-shell,
-  .lang-menu, .avatar-menu {
+  .auth-card, .auth-shell {
     max-width: 100%;
     min-width: 0;
+  }
+  /* Lang/avatar dropdowns are absolutely positioned over the tiny trigger,
+     so max-width:100% would resolve to ~40px and squeeze the labels into
+     letter-per-line. Cap to the viewport instead. */
+  .lang-menu, .avatar-menu {
+    max-width: calc(100vw - 20px);
+    min-width: 220px;
   }
   /* No card / table / message ever scrolls horizontally on mobile. */
   .card { overflow-x: hidden !important; }
