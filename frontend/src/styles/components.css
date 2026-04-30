@@ -325,8 +325,8 @@ main.content > .miz-loader {
   /* finance stat cards full-width */
   .finance-overview { grid-template-columns: 1fr 1fr !important; }
 
-  /* tables to horizontal scroll */
-  .card .table { display: block; overflow-x: auto; white-space: nowrap; }
+  /* tables on mobile: handled by stack-mode rules below — no horizontal scroll */
+  .card .table { white-space: normal; }
 
   /* modal full-width on mobile */
   .modal { max-width: calc(100vw - 24px) !important; padding: 18px; }
@@ -689,6 +689,108 @@ main.content { max-width: 100%; overflow-x: hidden; }
 .list-item { gap: 12px; }
 .list-item > * { min-width: 0; }
 
+/* ===================================================================
+   ZERO horizontal scroll on mobile.
+   Long words / URLs / russian phrases must wrap, not push the layout.
+   =================================================================== */
+@media (max-width: 900px) {
+  /* Make sure no element ever creates a horizontal scrollbar on the page. */
+  html, body, .app-shell, main.content, aside.sidebar, header.topbar { overflow-x: hidden; }
+  .card, .modal, .modal-body, .ai-shell, .ai-body, .ai-msg, .ai-msg .bubble,
+  .chat-shell, .chat-pane, .chat-messages, .chat-msg,
+  .list, .list-item, .field, .form-row, .row,
+  .fin-stat, .fin-stats, .fin-toolbar,
+  .topbar, .topbar .title-block, .topbar .title,
+  .day-detail-list, .day-detail-item,
+  .agenda-day, .agenda-events, .agenda-event,
+  .qb-question, .qb-options, .qb-option,
+  .quiz-question, .quiz-options, .quiz-option,
+  .group-card, .group-members,
+  .notes-card,
+  .pdf-preview-modal,
+  .auth-card, .auth-shell,
+  .lang-menu, .avatar-menu {
+    max-width: 100%;
+    min-width: 0;
+  }
+  /* No card / table / message ever scrolls horizontally on mobile. */
+  .card { overflow-x: hidden !important; }
+  /* Long text content wraps */
+  .card, .modal, .ai-msg .bubble, .chat-msg, .agenda-event, .day-detail-item,
+  .list-item, .badge, .empty, .qb-option .input, p, h1, h2, h3, h4, h5, h6,
+  .notif-item, .table td, .table th, .lang-option, .avatar-menu-item,
+  .topbar .title {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+  /* Links can be long URLs */
+  a { word-break: break-all; overflow-wrap: anywhere; }
+}
+
+/* ---------- Tables → vertical stack mode on phones (no horizontal scroll) ---------- */
+@media (max-width: 640px) {
+  .card .table {
+    display: block;
+    width: 100%;
+    min-width: 0 !important;
+    white-space: normal !important;
+  }
+  .card .table thead { display: none; }
+  .card .table tbody { display: block; width: 100%; }
+  .card .table tr {
+    display: block;
+    width: 100%;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .card .table tr:last-child { border-bottom: none; }
+  .card .table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    border: none;
+    text-align: right;
+    font-size: 13px;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+  .card .table td:first-child {
+    justify-content: flex-start;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text);
+    font-size: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed var(--border);
+    margin-bottom: 4px;
+  }
+  /* Last cell with action buttons gets full width */
+  .card .table td:last-child:not(:first-child) {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+  .card .table td .badge { white-space: normal; }
+  /* Hover hint not needed on stack mode */
+  .card .table tr:hover td { background: transparent; }
+  .card .table tr:hover { background: var(--surface-2); }
+
+  /* Finance bars chart: keep within card width */
+  .fin-bars { grid-template-columns: repeat(auto-fit, minmax(8px, 1fr)) !important; height: 60px; }
+
+  /* Calendar mini-events: never overflow grid cell */
+  .cal-event { word-break: break-all; }
+
+  /* Day-detail items: long titles wrap inside */
+  .day-detail-item .time { white-space: nowrap; }
+  .day-detail-item > div:nth-child(3) { min-width: 0; overflow: hidden; }
+  .day-detail-item > div:nth-child(3) > div { white-space: normal !important; word-break: break-word; }
+
+  /* Topbar title: ellipsis when truncating */
+  .topbar .title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+}
+
 /* On iOS, font-size < 16px on inputs causes auto-zoom; bump on touch screens */
 @media (hover: none) and (pointer: coarse) {
   .input, .select, .textarea, .ai-input, .chat-input textarea {
@@ -750,16 +852,16 @@ main.content { max-width: 100%; overflow-x: hidden; }
   .course-shell { grid-template-columns: 1fr !important; }
   .chat-shell { grid-template-columns: 1fr !important; }
 
-  /* Cards never overflow their grid track horizontally; if a table inside
-     is wider than the card, the card scrolls horizontally so the user
-     can reach the last column instead of it being clipped off-screen. */
-  .card { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* No horizontal scroll on cards: tables become stacked rows on phones (see media-640).
+     On 641-900px (large phone / tablet portrait) a table can still need to fit; we
+     just clip overflow rather than scroll, and rely on word-break/wrap below. */
+  .card { max-width: 100%; overflow-x: hidden; }
   .card, .card > * { min-width: 0; }
   .card .table {
     display: table;
     width: 100%;
-    min-width: max-content;
-    white-space: nowrap;
+    table-layout: auto;
+    white-space: normal;
   }
   /* Inputs with width:100% inside flex containers were ignoring shrink
      because their auto flex-basis came from the width declaration. Force
