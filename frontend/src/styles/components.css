@@ -596,19 +596,16 @@ main.content > .miz-loader {
   .lang-trigger { padding: 6px 8px; }
   .lang-trigger .lang-code { display: none; }
   .user-name-label { display: none; }
+  /* Stay anchored to the trigger (topbar is sticky now), but never wider
+     than the viewport. */
   .lang-menu {
-    position: fixed;
-    top: auto !important;
-    bottom: 12px;
-    left: 12px;
-    right: 12px;
-    width: auto;
-    max-width: none;
-    padding: 8px;
-    border-radius: 14px;
-    animation: miz-fade-up 0.22s ease-out both;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    width: min(240px, calc(100vw - 20px));
+    padding: 6px;
   }
-  .lang-option { padding: 14px 14px; font-size: 15px; }
+  .lang-option { padding: 12px 12px; font-size: 15px; }
 }
 
 /* ---------- Avatar dropdown menu (self-contained, no .card inheritance) ---------- */
@@ -891,23 +888,13 @@ main.content { max-width: 100%; overflow-x: hidden; }
   .topbar .right { gap: 10px; }
   .topbar .right .muted { display: none; }
 
-  /* Avatar dropdown — bottom sheet on mobile/tablet for safe placement */
+  /* Avatar dropdown stays anchored to the avatar (topbar is sticky now),
+     just constrained to viewport width. */
   .avatar-menu {
-    position: fixed !important;
-    left: 12px;
-    right: 12px;
-    top: auto !important;
-    bottom: 12px;
-    width: auto !important;
-    max-height: 50vh;
-    overflow-y: auto;
-    border-radius: 14px;
-    padding: 8px !important;
-    z-index: 200;
-    animation: miz-fade-up 0.22s ease-out both;
+    width: min(240px, calc(100vw - 20px));
   }
   .avatar-menu-item {
-    padding: 14px 14px;
+    padding: 12px 12px;
     font-size: 15px;
   }
 
