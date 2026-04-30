@@ -264,6 +264,40 @@ main.content > .miz-loader {
 .modal-close:hover { background: var(--surface-2); color: var(--text); }
 .modal-body { /* container for content */ }
 
+/* 2-column modal form: side-by-side blocks on tablet+, stacks on phones */
+.modal-form-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+.modal-form-2col > section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.modal-section-title {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+@media (max-width: 760px) {
+  .modal-form-2col { grid-template-columns: 1fr; gap: 14px; }
+}
+
+/* Notifications — clickable card style */
+.notif-item.clickable { cursor: pointer; transition: background 0.15s, transform 0.12s; }
+.notif-item.clickable:hover { background: var(--primary-50); }
+.notif-item.clickable:active { transform: translateX(1px); }
+.notif-detail-row { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.notif-detail-row:last-child { border-bottom: none; }
+.notif-detail-row .label { min-width: 110px; font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.notif-detail-row .value { flex: 1; font-size: 14px; color: var(--text); word-break: break-word; }
+
 /* ---------- Mobile responsive ---------- */
 .sidebar-backdrop {
   display: none;
@@ -849,7 +883,10 @@ main.content { max-width: 100%; overflow-x: hidden; }
    =================================================================== */
 @media (max-width: 900px) {
   /* Make sure no element ever creates a horizontal scrollbar on the page. */
-  html, body, .app-shell, main.content, aside.sidebar, header.topbar { overflow-x: hidden; }
+  html, body, .app-shell, main.content, aside.sidebar { overflow-x: hidden; }
+  /* Topbar must NOT clip — dropdowns (lang/avatar) need to overflow vertically.
+     overflow-x: hidden + visible-y forces auto on overflow-y, which clips menus. */
+  header.topbar { overflow: visible; }
   .card, .modal, .modal-body, .ai-shell, .ai-body, .ai-msg, .ai-msg .bubble,
   .chat-shell, .chat-pane, .chat-messages, .chat-msg,
   .list, .list-item, .field, .form-row, .row,

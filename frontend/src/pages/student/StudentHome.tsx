@@ -4,6 +4,7 @@ import { useApi } from '../../hooks';
 import { TreeView } from '../../components/Tree';
 import { SkeletonGrid } from '../../components/Skeleton';
 import { NotesCard } from '../../components/NotesCard';
+import { NotificationDetailsModal } from '../../components/NotificationDetailsModal';
 import { useT } from '../../i18n';
 
 export function StudentHome() {
@@ -11,6 +12,7 @@ export function StudentHome() {
   const { data, loading: loadingDash } = useApi<any>('/students/me/dashboard');
   const { data: progress } = useApi<any>('/progress/me');
   const [showProgress, setShowProgress] = useState(false);
+  const [pickedNotif, setPickedNotif] = useState<any>(null);
 
   if (!data && !progress && loadingDash) {
     return (
@@ -94,7 +96,14 @@ export function StudentHome() {
         <h3>{t('home.notifications')}</h3>
         <div className="list">
           {(data?.notifications || []).slice(0, 8).map((n: any) => (
-            <div key={n.id} className={`notif-item ${n.read ? '' : 'unread'}`}>
+            <div
+              key={n.id}
+              role="button"
+              tabIndex={0}
+              className={`notif-item clickable ${n.read ? '' : 'unread'}`}
+              onClick={() => setPickedNotif(n)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setPickedNotif(n); } }}
+            >
               <div style={{ fontWeight: 500 }}>{n.title}</div>
               {n.body && <div className="muted" style={{ fontSize: 13 }}>{n.body}</div>}
               <div className="meta">{new Date(n.createdAt).toLocaleString()}</div>
@@ -103,6 +112,10 @@ export function StudentHome() {
           {(!data?.notifications || data.notifications.length === 0) && <div className="empty">{t('empty.noNotifications')}</div>}
         </div>
       </div>
+
+      {pickedNotif && (
+        <NotificationDetailsModal notif={pickedNotif} onClose={() => setPickedNotif(null)} />
+      )}
     </Shell>
   );
 }

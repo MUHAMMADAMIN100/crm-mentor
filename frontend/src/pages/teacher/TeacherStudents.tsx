@@ -97,38 +97,34 @@ export function TeacherStudents() {
         </div>
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title={t('students.newStudent')} width={620}
+      <Modal open={open} onClose={() => setOpen(false)} title={t('students.newStudent')} width={920}
         footer={<><button className="btn" onClick={() => setOpen(false)}>{t('btn.cancel')}</button><button className="btn btn-primary" onClick={create} disabled={saving}>{saving ? t('status.creating') : t('btn.create')}</button></>}>
-        <h4 style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--text-soft)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Учётная запись</h4>
-        <div className="row">
-          <div className="field"><label>{t('profile.fullName')} *</label><input className="input" value={form.fullName} onChange={(e) => up('fullName', e.target.value)} /></div>
-          <div className="field"><label>{t('profile.login')} *</label><input className="input" value={form.login} onChange={(e) => up('login', e.target.value)} /></div>
-        </div>
-        <div className="row">
-          <div className="field"><label>{t('auth.password')} *</label>
-            <input className="input" type="text" value={form.password} onChange={(e) => up('password', e.target.value)} placeholder="мин. 6 символов" />
-          </div>
-          <div className="field"><label>{t('students.individualPrice')}</label><input type="number" className="input" value={form.individualPrice} onChange={(e) => up('individualPrice', +e.target.value)} /></div>
-        </div>
+        <div className="modal-form-2col">
+          <section>
+            <h4 className="modal-section-title">Учётная запись</h4>
+            <div className="field"><label>{t('profile.fullName')} *</label><input className="input" value={form.fullName} onChange={(e) => up('fullName', e.target.value)} /></div>
+            <div className="field"><label>{t('profile.login')} *</label><input className="input" value={form.login} onChange={(e) => up('login', e.target.value)} /></div>
+            <div className="field"><label>{t('auth.password')} *</label>
+              <input className="input" type="text" value={form.password} onChange={(e) => up('password', e.target.value)} placeholder="мин. 6 символов" />
+            </div>
+            <div className="field"><label>{t('students.individualPrice')}</label><input type="number" className="input" value={form.individualPrice} onChange={(e) => up('individualPrice', +e.target.value)} /></div>
 
-        <h4 style={{ margin: '14px 0 8px', fontSize: 12, color: 'var(--text-soft)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Контакты</h4>
-        <div className="row">
-          <div className="field"><label>{t('profile.email')}</label><input className="input" type="email" value={form.email} onChange={(e) => up('email', e.target.value)} /></div>
-          <div className="field"><label>{t('profile.phone')}</label><input className="input" value={form.phone} onChange={(e) => up('phone', e.target.value)} placeholder="+7 999 …" /></div>
-        </div>
-        <div className="row">
-          <div className="field"><label>{t('profile.telegram')}</label><input className="input" value={form.telegram} onChange={(e) => up('telegram', e.target.value)} placeholder="@username" /></div>
-          <div className="field"><label>{t('profile.whatsapp')}</label><input className="input" value={form.whatsapp} onChange={(e) => up('whatsapp', e.target.value)} /></div>
-        </div>
-        <div className="row">
-          <div className="field"><label>{t('profile.instagram')}</label><input className="input" value={form.instagram} onChange={(e) => up('instagram', e.target.value)} placeholder="@username" /></div>
-          <div className="field"><label>{t('profile.website')}</label><input className="input" value={form.website} onChange={(e) => up('website', e.target.value)} placeholder="https://…" /></div>
-        </div>
-        <div className="field"><label>{t('profile.city')}</label><input className="input" value={form.city} onChange={(e) => up('city', e.target.value)} /></div>
+            <h4 className="modal-section-title" style={{ marginTop: 18 }}>Доп. информация</h4>
+            <div className="field"><label>{t('profile.city')}</label><input className="input" value={form.city} onChange={(e) => up('city', e.target.value)} /></div>
+            <div className="field"><label>{t('profile.goal')}</label><input className="input" value={form.goal} onChange={(e) => up('goal', e.target.value)} /></div>
+            <div className="field"><label>{t('profile.bio')}</label><textarea className="textarea" value={form.bio} onChange={(e) => up('bio', e.target.value)} placeholder={t('profile.bioPlaceholder')} /></div>
+          </section>
 
-        <h4 style={{ margin: '14px 0 8px', fontSize: 12, color: 'var(--text-soft)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Доп. информация</h4>
-        <div className="field"><label>{t('profile.goal')}</label><input className="input" value={form.goal} onChange={(e) => up('goal', e.target.value)} /></div>
-        <div className="field"><label>{t('profile.bio')}</label><textarea className="textarea" value={form.bio} onChange={(e) => up('bio', e.target.value)} placeholder={t('profile.bioPlaceholder')} /></div>
+          <section>
+            <h4 className="modal-section-title">Контакты</h4>
+            <div className="field"><label>{t('profile.email')}</label><input className="input" type="email" value={form.email} onChange={(e) => up('email', e.target.value)} /></div>
+            <div className="field"><label>{t('profile.phone')}</label><input className="input" value={form.phone} onChange={(e) => up('phone', e.target.value)} placeholder="+7 999 …" /></div>
+            <div className="field"><label>{t('profile.telegram')}</label><input className="input" value={form.telegram} onChange={(e) => up('telegram', e.target.value)} placeholder="@username" /></div>
+            <div className="field"><label>{t('profile.whatsapp')}</label><input className="input" value={form.whatsapp} onChange={(e) => up('whatsapp', e.target.value)} /></div>
+            <div className="field"><label>{t('profile.instagram')}</label><input className="input" value={form.instagram} onChange={(e) => up('instagram', e.target.value)} placeholder="@username" /></div>
+            <div className="field"><label>{t('profile.website')}</label><input className="input" value={form.website} onChange={(e) => up('website', e.target.value)} placeholder="https://…" /></div>
+          </section>
+        </div>
       </Modal>
     </Shell>
   );

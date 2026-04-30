@@ -1,4 +1,5 @@
 import { ReactNode, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 export function Modal({
   open,
@@ -29,7 +30,10 @@ export function Modal({
   }, [open, onClose]);
 
   if (!open) return null;
-  return (
+  // Portal to body so the modal isn't trapped inside `main.content`'s
+  // transformed containing block — this is what makes it visually centered
+  // in the viewport rather than offset to the right of the sidebar.
+  return createPortal(
     <div className="modal-overlay" role="presentation" onClick={onClose}>
       <div
         className="modal"
@@ -46,6 +50,7 @@ export function Modal({
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-actions">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
