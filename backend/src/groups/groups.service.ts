@@ -87,4 +87,47 @@ export class GroupsService {
     }
     return { ok: true };
   }
+
+  async update(
+    teacherId: string,
+    groupId: string,
+    body: { name?: string; courseId?: string | null; members?: { studentProfileId: string; pricePerLesson: number }[] },
+  ) {
+    const g = await this.prisma.group.findUnique({ where: { id: groupId } });
+    if (!g || g.teacherId !== teacherId) throw new ForbiddenException();
+    if (body.name !== undefined || body.courseId !== undefined) {
+      await this.prisma.group.update({
+        where: { id: groupId },
+        data: {
+          name: body.name ?? undefined,
+          courseId: body.courseId === undefined ? undefined : body.courseId,
+        },
+      });
+    }
+    if (body.members) {
+      // Replace members atomically: delete old, insert new
+      await this.prisma.$transaction([
+        this.prisma.groupMember.deleteMany({ where: { groupId } }),
+        ...body.members.map((m) =>
+          this.prisma.groupMember.create({
+            data: { groupId, studentId: m.studentProfileId, pricePerLesson: m.pricePerLesson },
+          }),
+        ),
+      ]);
+    }
+    return this.prisma.group.findUnique({
+      where: { id: groupId },
+      include: {
+        members: { include: { student: { include: { user: true } } } },
+        course: true, chat: true,
+      },
+    });
+  }
+
+  async remove(teacherId: string, groupId: string) {
+    const g = await this.prisma.group.findUnique({ where: { id: groupId } });
+    if (!g || g.teacherId !== teacherId) throw new ForbiddenException();
+    await this.prisma.group.delete({ where: { id: groupId } });
+    return { ok: true };
+  }
 }

@@ -57,6 +57,9 @@ export class AuthService {
         email: data.email ?? undefined,
         phone: data.phone ?? undefined,
         telegram: data.telegram ?? undefined,
+        whatsapp: data.whatsapp ?? undefined,
+        instagram: data.instagram ?? undefined,
+        website: data.website ?? undefined,
         birthDate: data.birthDate ? new Date(data.birthDate) : undefined,
         gender: data.gender ?? undefined,
         city: data.city ?? undefined,
@@ -65,6 +68,30 @@ export class AuthService {
         goal: data.goal ?? undefined,
         bio: data.bio ?? undefined,
         profileCompleted: true,
+      },
+    });
+    return this.sanitize(user);
+  }
+
+  /** Updates only profile-editable fields (no role/login/password change). */
+  async updateProfile(userId: string, data: any) {
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        fullName: data.fullName ?? undefined,
+        email: data.email ?? undefined,
+        phone: data.phone ?? undefined,
+        telegram: data.telegram ?? undefined,
+        whatsapp: data.whatsapp ?? undefined,
+        instagram: data.instagram ?? undefined,
+        website: data.website ?? undefined,
+        birthDate: data.birthDate ? new Date(data.birthDate) : (data.birthDate === '' ? null : undefined),
+        gender: data.gender || undefined,
+        city: data.city ?? undefined,
+        activity: data.activity ?? undefined,
+        category: data.category ?? undefined,
+        goal: data.goal ?? undefined,
+        bio: data.bio ?? undefined,
       },
     });
     return this.sanitize(user);

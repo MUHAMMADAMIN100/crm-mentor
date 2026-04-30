@@ -135,9 +135,32 @@ export class CalendarService {
   }
 
   // FREE SLOTS
-  createFreeSlot(teacherId: string, body: { startAt: string; durationMin?: number }) {
+  createFreeSlot(teacherId: string, body: { startAt: string; durationMin?: number; endAt?: string }) {
+    const start = new Date(body.startAt);
+    let dur = body.durationMin ?? 60;
+    if (body.endAt) {
+      const end = new Date(body.endAt);
+      const min = Math.round((end.getTime() - start.getTime()) / 60000);
+      if (min > 0) dur = min;
+    }
     return this.prisma.freeSlot.create({
-      data: { teacherId, startAt: new Date(body.startAt), durationMin: body.durationMin ?? 60 },
+      data: { teacherId, startAt: start, durationMin: dur },
+    });
+  }
+
+  async updateFreeSlot(teacherId: string, id: string, body: { startAt?: string; durationMin?: number; endAt?: string }) {
+    const s = await this.prisma.freeSlot.findUnique({ where: { id } });
+    if (!s || s.teacherId !== teacherId) throw new ForbiddenException();
+    const start = body.startAt ? new Date(body.startAt) : s.startAt;
+    let dur = body.durationMin ?? s.durationMin;
+    if (body.endAt) {
+      const end = new Date(body.endAt);
+      const min = Math.round((end.getTime() - start.getTime()) / 60000);
+      if (min > 0) dur = min;
+    }
+    return this.prisma.freeSlot.update({
+      where: { id },
+      data: { startAt: start, durationMin: dur },
     });
   }
 
@@ -156,6 +179,20 @@ export class CalendarService {
         startAt: new Date(body.startAt),
         reminder: !!body.reminder,
         description: body.description || null,
+      },
+    });
+  }
+
+  async updateEvent(userId: string, id: string, body: { title?: string; startAt?: string; reminder?: boolean; description?: string }) {
+    const e = await this.prisma.personalEvent.findUnique({ where: { id } });
+    if (!e || e.userId !== userId) throw new ForbiddenException();
+    return this.prisma.personalEvent.update({
+      where: { id },
+      data: {
+        title: body.title ?? undefined,
+        startAt: body.startAt ? new Date(body.startAt) : undefined,
+        reminder: body.reminder ?? undefined,
+        description: body.description ?? undefined,
       },
     });
   }

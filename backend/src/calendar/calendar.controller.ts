@@ -25,11 +25,17 @@ export class CalendarController {
   @Roles('TEACHER') @Post('free-slots') createFreeSlot(@CurrentUser() u, @Body() b: any) {
     return this.svc.createFreeSlot(u.id, b);
   }
+  @Roles('TEACHER') @Patch('free-slots/:id') updateFreeSlot(@CurrentUser() u, @Param('id') id: string, @Body() b: any) {
+    return this.svc.updateFreeSlot(u.id, id, b);
+  }
   @Roles('TEACHER') @Delete('free-slots/:id') deleteFreeSlot(@CurrentUser() u, @Param('id') id: string) {
     return this.svc.deleteFreeSlot(u.id, id);
   }
 
   @Post('events') createEvent(@CurrentUser() u, @Body() b: any) { return this.svc.createEvent(u.id, b); }
+  @Patch('events/:id') updateEvent(@CurrentUser() u, @Param('id') id: string, @Body() b: any) {
+    return this.svc.updateEvent(u.id, id, b);
+  }
   @Delete('events/:id') deleteEvent(@CurrentUser() u, @Param('id') id: string) { return this.svc.deleteEvent(u.id, id); }
 
   @Roles('STUDENT') @Get('student') student(@CurrentUser() u, @Query('from') from?: string, @Query('to') to?: string) {

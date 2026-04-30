@@ -147,6 +147,17 @@
   z-index: 3000;
   animation: miz-fade-in 0.3s ease-out both;
 }
+/* Inline (non-fullscreen) loader: ensure it sits in the centre of its container */
+.miz-loader:not(.miz-loader-full *) {
+  margin: 0 auto;
+  width: fit-content;
+}
+/* When loader is the only child of a card / container, vertically centre it */
+.card > .miz-loader,
+.empty + .miz-loader,
+main.content > .miz-loader {
+  margin: 40px auto;
+}
 @keyframes miz-orbit-spin {
   to { transform: rotate(360deg); }
 }
@@ -522,9 +533,29 @@
   position: absolute;
   right: 0;
   top: 44px;
-  min-width: 200px;
+  min-width: 220px;
   padding: 8px;
   z-index: 50;
+}
+
+/* ---------- Back button in topbar ---------- */
+.back-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 500; font-size: 13px;
+  transition: 0.15s;
+}
+.back-btn:hover { background: var(--surface-2); border-color: var(--primary-200); color: var(--primary-700); transform: translateX(-2px); }
+.back-btn:active { transform: translateX(0); }
+.back-btn svg { width: 16px; height: 16px; }
+@media (max-width: 640px) {
+  .back-btn { padding: 7px 10px; }
+  .back-btn .back-btn-label { display: none; }
 }
 
 /* ===================================================================
@@ -872,6 +903,97 @@ main.content { max-width: 100%; overflow-x: hidden; }
   main.content { padding: 0 !important; }
   .card { box-shadow: none; border: 1px solid #ddd; break-inside: avoid; }
 }
+
+/* drag-drop visual feedback */
+.cal-day.drag-over {
+  background: var(--primary-100);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-200);
+}
+.cal-event[draggable="true"] { cursor: grab; }
+.cal-event[draggable="true"]:active { cursor: grabbing; opacity: 0.6; }
+
+/* Group cards: compact box with avatars */
+.groups-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important; }
+.group-card { display: flex; flex-direction: column; gap: 12px; }
+.group-card .group-header { display: flex; flex-direction: column; gap: 4px; }
+.group-card .group-meta { font-size: 12px; }
+.group-card .group-members {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  min-height: 28px;
+}
+.group-card .group-member {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--primary-50);
+  color: var(--primary-700);
+  padding: 3px 10px 3px 3px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.group-card .member-avatar {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), #a78bfa);
+  color: #fff; font-weight: 600; font-size: 10px;
+  display: inline-flex; align-items: center; justify-content: center;
+  text-transform: uppercase;
+}
+.group-card .member-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
+.group-card .group-member-more {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px; font-weight: 500;
+}
+.group-card .group-actions { display: flex; gap: 6px; margin-top: auto; padding-top: 4px; border-top: 1px dashed var(--border); }
+.group-card .group-actions .btn { flex: 1; }
+
+/* Agenda (mobile-friendly) */
+.agenda-list { display: flex; flex-direction: column; gap: 6px; }
+.agenda-day {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: 0.15s;
+}
+.agenda-day:hover { border-color: var(--primary-200); background: var(--surface-2); }
+.agenda-day.today { background: linear-gradient(180deg, var(--primary-50), #fff); border-color: var(--primary-200); }
+.agenda-day.empty { opacity: 0.6; }
+.agenda-date {
+  width: 56px; flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--surface-2);
+  border-radius: 8px;
+}
+.agenda-day.today .agenda-date { background: var(--primary); color: #fff; }
+.agenda-num { font-size: 22px; font-weight: 700; line-height: 1; }
+.agenda-wd { font-size: 11px; color: var(--text-soft); margin-top: 2px; text-transform: uppercase; }
+.agenda-day.today .agenda-wd { color: rgba(255, 255, 255, 0.85); }
+.agenda-events { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; justify-content: center; }
+.agenda-event {
+  display: flex; gap: 8px; align-items: center;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  background: var(--primary-50);
+  color: var(--primary-700);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: pointer;
+}
+.agenda-event[draggable="true"] { cursor: grab; }
+.agenda-event.completed { background: #dcfce7; color: var(--success); }
+.agenda-event.past { background: #e2e8f0; color: #475569; }
+.agenda-event.free { background: #fef9c3; color: #a16207; }
+.agenda-event.event { background: #ede9fe; color: var(--primary-700); }
+.agenda-time { font-weight: 600; flex-shrink: 0; min-width: 38px; }
+.agenda-title { overflow: hidden; text-overflow: ellipsis; }
 
 /* day-detail list */
 .day-detail-list { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; }

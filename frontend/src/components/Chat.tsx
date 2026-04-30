@@ -196,7 +196,6 @@ export function ChatPanel({ autoOpenWithUserId }: Props = {}) {
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={onKeyDown}
-                placeholder="Сообщение… (Enter — отправить, Shift+Enter — новая строка)"
                 rows={1}
               />
               <button className="btn btn-primary" onClick={send} disabled={!text.trim()}>
