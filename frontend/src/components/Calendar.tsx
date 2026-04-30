@@ -20,6 +20,14 @@ interface Props {
 function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
+function startOfToday(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+function isPastDay(d: Date): boolean {
+  return d < startOfToday();
+}
 
 export function MonthCalendar({ month, events, onDayClick, onEventClick, onEventMove }: Props) {
   const { t } = useT();
@@ -62,15 +70,17 @@ export function MonthCalendar({ month, events, onDayClick, onEventClick, onEvent
           const dayEvents = events.filter((e) => isSameDay(new Date(e.startAt), date))
             .sort((a, b) => +new Date(a.startAt) - +new Date(b.startAt));
           const todayCls = isSameDay(date, today) ? 'today' : '';
+          const past = isPastDay(date);
+          const pastCls = past ? 'past-day' : '';
           const dayKey = date.toDateString();
           const dragOverCls = dragOverDay === dayKey ? 'drag-over' : '';
           return (
             <div
               key={idx}
-              className={`cal-day ${outside ? 'other-month' : ''} ${todayCls} ${dragOverCls}`}
-              onClick={() => onDayClick && onDayClick(date)}
+              className={`cal-day ${outside ? 'other-month' : ''} ${todayCls} ${pastCls} ${dragOverCls}`}
+              onClick={() => { if (!past) onDayClick && onDayClick(date); }}
               onDragOver={(e) => {
-                if (!onEventMove) return;
+                if (!onEventMove || past) return;
                 e.preventDefault();
                 setDragOverDay(dayKey);
               }}
@@ -78,14 +88,14 @@ export function MonthCalendar({ month, events, onDayClick, onEventClick, onEvent
                 if (dragOverDay === dayKey) setDragOverDay(null);
               }}
               onDrop={(e) => {
-                if (!onEventMove) return;
+                if (!onEventMove || past) return;
                 e.preventDefault();
                 const eid = e.dataTransfer.getData('text/event-id');
                 setDragOverDay(null);
                 if (eid) onEventMove(eid, date);
               }}
-              role="button"
-              tabIndex={0}
+              role={past ? undefined : 'button'}
+              tabIndex={past ? -1 : 0}
             >
               <div className="num">{date.getDate()}</div>
               {dayEvents.slice(0, 4).map((e) => (
@@ -134,10 +144,11 @@ export function AgendaCalendar({ month, events, onDayClick, onEventClick, onEven
         const dayEvents = events.filter((e) => isSameDay(new Date(e.startAt), d))
           .sort((a, b) => +new Date(a.startAt) - +new Date(b.startAt));
         const isToday = isSameDay(d, today);
+        const past = isPastDay(d);
         const wd = (d.getDay() + 6) % 7;
         return (
-          <div key={d.toDateString()} className={`agenda-day ${isToday ? 'today' : ''} ${dayEvents.length === 0 ? 'empty' : ''}`}
-            onClick={() => onDayClick && onDayClick(d)}>
+          <div key={d.toDateString()} className={`agenda-day ${isToday ? 'today' : ''} ${past ? 'past-day' : ''} ${dayEvents.length === 0 ? 'empty' : ''}`}
+            onClick={() => { if (!past) onDayClick && onDayClick(d); }}>
             <div className="agenda-date">
               <div className="agenda-num">{d.getDate()}</div>
               <div className="agenda-wd">{t(`calendar.weekday.${wd}` as any)}</div>

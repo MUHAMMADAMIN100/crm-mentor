@@ -41,6 +41,12 @@ export function StudentCalendar() {
 
   async function handleEventMove(eventId: string, targetDay: Date) {
     if (!eventId.startsWith('E')) return; // student can move only own events
+    // Disallow dropping into past days
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    if (targetDay < todayStart) {
+      toast.warning(t('toast.error'));
+      return;
+    }
     const id = eventId.slice(1);
     const ev = data.events.find((x: any) => x.id === id);
     if (!ev) return;

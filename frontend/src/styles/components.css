@@ -1109,6 +1109,41 @@ main.content { max-width: 100%; overflow-x: hidden; }
   border-color: var(--primary);
   box-shadow: 0 0 0 2px var(--primary-200);
 }
+
+/* Past days: greyed out, not clickable, no hover effect */
+.cal-day.past-day {
+  background: var(--surface-2);
+  cursor: default;
+  opacity: 0.6;
+}
+.cal-day.past-day:hover {
+  border-color: var(--border);
+  box-shadow: none;
+  transform: none;
+}
+.cal-day.past-day .num {
+  color: var(--text-muted);
+}
+/* But events on past days remain readable & clickable */
+.cal-day.past-day .cal-event {
+  opacity: 0.95;
+}
+
+.agenda-day.past-day {
+  background: var(--surface-2);
+  cursor: default;
+  opacity: 0.65;
+}
+.agenda-day.past-day:hover {
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+.agenda-day.past-day .agenda-date {
+  background: #e5e7eb;
+}
+.agenda-day.past-day .agenda-num {
+  color: var(--text-muted);
+}
 .cal-event[draggable="true"] { cursor: grab; }
 .cal-event[draggable="true"]:active { cursor: grabbing; opacity: 0.6; }
 

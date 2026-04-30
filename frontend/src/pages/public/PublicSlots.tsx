@@ -108,14 +108,16 @@ export function PublicSlots() {
               </div>
               <div className="calendar-grid">
                 {cells.map(({ date, outside }, idx) => {
-                  const ds = slotsByDay(date);
+                  const todayStart = new Date(today); todayStart.setHours(0, 0, 0, 0);
+                  const past = date < todayStart;
+                  const ds = past ? [] : slotsByDay(date);
                   const has = ds.length > 0;
                   const isToday = isSameDay(date, today);
                   return (
                     <div key={idx}
-                      className={`cal-day ${outside ? 'other-month' : ''} ${isToday ? 'today' : ''}`}
-                      onClick={() => has && setPickedDay(date)}
-                      style={{ cursor: has ? 'pointer' : 'default', opacity: outside ? 0.4 : has ? 1 : 0.6 }}>
+                      className={`cal-day ${outside ? 'other-month' : ''} ${isToday ? 'today' : ''} ${past ? 'past-day' : ''}`}
+                      onClick={() => { if (!past && has) setPickedDay(date); }}
+                      style={{ cursor: !past && has ? 'pointer' : 'default', opacity: outside ? 0.4 : past ? 0.5 : has ? 1 : 0.6 }}>
                       <div className="num">{date.getDate()}</div>
                       {has && (
                         <div className="cal-event free" style={{ marginTop: 4 }}>

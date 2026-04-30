@@ -88,6 +88,12 @@ export function TeacherCalendar() {
 
   /** Drag-drop: move event to another day, keeping the time. Optimistic. */
   async function handleEventMove(eventId: string, targetDay: Date) {
+    // Disallow dropping into past days
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    if (targetDay < todayStart) {
+      toast.warning(t('toast.error'));
+      return;
+    }
     const prefix = eventId[0];
     const id = eventId.slice(1);
     const arr = prefix === 'L' ? 'lessons' : prefix === 'F' ? 'freeSlots' : 'events';
