@@ -43,16 +43,28 @@ export function TeacherCalendar() {
   const [action, setAction] = useState<Action>(null);
   const [pickedEvent, setPickedEvent] = useState<any>(null);
 
-  function load() {
+  function load(silent = false) {
     const from = new Date(month.getFullYear(), month.getMonth() - 1, 1).toISOString();
     const to = new Date(month.getFullYear(), month.getMonth() + 2, 1).toISOString();
     setLoading(true);
     api.get('/calendar', { params: { from, to } })
       .then((r) => setData(r.data))
-      .catch(() => toast.error(t('calendar.notLoaded')))
+      .catch(() => {
+        // Silent first attempt — retry once after 1.5s (Railway cold start).
+        // Only show toast if the retry also fails.
+        if (!silent) {
+          setTimeout(() => {
+            api.get('/calendar', { params: { from, to } })
+              .then((r) => setData(r.data))
+              .catch(() => toast.error(t('calendar.notLoaded')));
+          }, 1500);
+        } else {
+          toast.error(t('calendar.notLoaded'));
+        }
+      })
       .finally(() => setLoading(false));
   }
-  useEffect(load, [month]);
+  useEffect(() => { load(); }, [month]);
 
   useEffect(() => {
     api.get('/students').then((r) => setStudents(r.data));

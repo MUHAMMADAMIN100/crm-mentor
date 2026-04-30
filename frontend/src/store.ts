@@ -99,6 +99,9 @@ export const useUI = create<UIState>((set, get) => ({
   toasts: [],
   confirms: [],
   pushToast(t) {
+    // Deduplicate: if a toast with the same kind+body already exists, skip.
+    const dup = get().toasts.find((x) => x.kind === t.kind && x.body === t.body);
+    if (dup) return;
     const id = _uid++;
     const toast: Toast = { id, ttl: 4000, ...t };
     set((s) => ({ toasts: [...s.toasts, toast] }));

@@ -26,7 +26,14 @@ export function StudentCalendar() {
     setLoading(true);
     api.get('/calendar/student', { params: { from, to } })
       .then((r) => setData(r.data))
-      .catch(() => toast.error(t('calendar.notLoaded')))
+      .catch(() => {
+        // Silent retry once for cold-start
+        setTimeout(() => {
+          api.get('/calendar/student', { params: { from, to } })
+            .then((r) => setData(r.data))
+            .catch(() => toast.error(t('calendar.notLoaded')));
+        }, 1500);
+      })
       .finally(() => setLoading(false));
   }
   useEffect(load, [month]);

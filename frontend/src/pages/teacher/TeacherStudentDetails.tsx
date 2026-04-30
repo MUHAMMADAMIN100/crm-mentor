@@ -174,7 +174,14 @@ function StudentCalendarCard({ student }: { student: any }) {
     const to = new Date(month.getFullYear(), month.getMonth() + 2, 1).toISOString();
     api.get('/calendar', { params: { from, to } })
       .then((r) => setData(r.data))
-      .catch(() => toast.error(t('calendar.notLoaded')));
+      .catch(() => {
+        // Silent retry once for cold-start
+        setTimeout(() => {
+          api.get('/calendar', { params: { from, to } })
+            .then((r) => setData(r.data))
+            .catch(() => toast.error(t('calendar.notLoaded')));
+        }, 1500);
+      });
   }
   useEffect(load, [month]);
 

@@ -197,7 +197,10 @@ main.content {
 
 /* Modal */
 .modal-overlay {
-  position: fixed; inset: 0; background: rgba(31, 29, 43, 0.5);
+  position: fixed; inset: 0;
+  background: rgba(245, 243, 255, 0.55);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
   display: flex; align-items: center; justify-content: center;
   z-index: 1000; padding: 16px;
 }
