@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../../api';
 import { Loading } from '../../components/Loading';
+import { Modal } from '../../components/Modal';
 import { toast } from '../../store';
 import { useT, useI18n, LANG_OPTIONS, Lang } from '../../i18n';
 
@@ -133,20 +134,17 @@ export function PublicSlots() {
             </div>
 
             {pickedDay && (
-              <div className="card">
-                <h3 style={{ margin: '0 0 12px' }}>
-                  {pickedDay.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
-                </h3>
+              <Modal open onClose={() => setPickedDay(null)} title={pickedDay.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })} width={520}>
                 <div className="list" style={{ maxHeight: 360, overflowY: 'auto' }}>
                   {slotsForPickedDay.map((s: any) => (
                     <div key={s.id} className="list-item">
                       <div>{new Date(s.startAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })} · {s.durationMin} {t('misc.duration60')}</div>
-                      <button className="btn btn-sm btn-primary" onClick={() => setPicked(s)}>{t('btn.choose')}</button>
+                      <button className="btn btn-sm btn-primary" onClick={() => { setPicked(s); setPickedDay(null); }}>{t('btn.choose')}</button>
                     </div>
                   ))}
                   {slotsForPickedDay.length === 0 && <div className="empty">{t('public.noSlotsDay')}</div>}
                 </div>
-              </div>
+              </Modal>
             )}
           </>
         ) : (

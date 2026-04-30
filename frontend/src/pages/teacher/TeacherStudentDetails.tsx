@@ -32,13 +32,14 @@ export function TeacherStudentDetails() {
   const [s, setS] = useState<any>(null);
   const [topup, setTopup] = useState({ amount: 0, comment: '' });
   const [topping, setTopping] = useState(false);
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
 
   function load() { api.get(`/students/${id}`).then((r) => setS(r.data)); }
   useEffect(load, [id]);
 
   async function toggleReschedule() {
     const next = !s.allowReschedule;
-    setS((cur: any) => ({ ...cur, allowReschedule: next }));   // optimistic
+    setS((cur: any) => ({ ...cur, allowReschedule: next }));
     try {
       await api.patch(`/students/${id}`, { allowReschedule: next });
       toast.success(t('finance.settings'));
@@ -49,7 +50,7 @@ export function TeacherStudentDetails() {
   }
   async function setPrice(v: number) {
     const old = s.individualPrice;
-    setS((cur: any) => ({ ...cur, individualPrice: v }));   // optimistic
+    setS((cur: any) => ({ ...cur, individualPrice: v }));
     try {
       await api.patch(`/students/${id}`, { individualPrice: v });
       toast.success(t('finance.priceUpdated'));
@@ -63,7 +64,6 @@ export function TeacherStudentDetails() {
     const amount = topup.amount;
     const comment = topup.comment;
     setTopping(true);
-    // Optimistic: bump balance and prepend payment row
     const prev = s;
     setS((cur: any) => ({
       ...cur,
@@ -74,7 +74,7 @@ export function TeacherStudentDetails() {
     try {
       await api.post(`/finance/teacher/students/${id}/topup`, { amount, comment });
       toast.success(`${t('finance.topup.success')} +${amount}`);
-      load();        // refresh in background to get the real payment row
+      load();
     } catch (e: any) {
       setS(prev);
       toast.error(e?.response?.data?.message || t('finance.topup.err'));
@@ -91,19 +91,33 @@ export function TeacherStudentDetails() {
   }
 
   if (!s) return <Shell title={t('students.title')}><Loading label={t('loader.profile')} /></Shell>;
+
   return (
     <Shell title={s.user.fullName}>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+      {/* Top-right action: chat with this student. Floats to the right on tablets+, full width on phones. */}
+      <div className="student-top-actions">
         <button className="btn btn-primary" onClick={openChat}>{t('btn.writeStudent')}</button>
       </div>
-      <div className="cards-grid">
+
+      <div className="student-grid">
         <div className="card">
-          <h3>{t('students.profile')}</h3>
-          <p><span className="muted">{t('profile.email')}:</span> {s.user.email || '—'}</p>
-          <p><span className="muted">{t('profile.phone')}:</span> {s.user.phone || '—'}</p>
-          <p><span className="muted">{t('profile.goal')}:</span> {s.user.goal || '—'}</p>
-          <p><span className="muted">{t('profile.bio')}:</span> {s.user.bio || '—'}</p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+            <h3 style={{ margin: 0 }}>{t('students.profile')}</h3>
+            <button className="btn btn-sm" onClick={() => setEditProfileOpen(true)}>✏️ {t('btn.edit')}</button>
+          </div>
+          <div className="profile-rows">
+            <ProfRow label={t('profile.email')} value={s.user.email} />
+            <ProfRow label={t('profile.phone')} value={s.user.phone} />
+            <ProfRow label={t('profile.telegram')} value={s.user.telegram} />
+            <ProfRow label={t('profile.whatsapp')} value={s.user.whatsapp} />
+            <ProfRow label={t('profile.instagram')} value={s.user.instagram} />
+            <ProfRow label={t('profile.website')} value={s.user.website} />
+            <ProfRow label={t('profile.city')} value={s.user.city} />
+            <ProfRow label={t('profile.goal')} value={s.user.goal} />
+            <ProfRow label={t('profile.bio')} value={s.user.bio} />
+          </div>
         </div>
+
         <div className="card">
           <h3>{t('settings.title')}</h3>
           <div className="field">
@@ -114,10 +128,12 @@ export function TeacherStudentDetails() {
             <input className="input" type="number" defaultValue={s.individualPrice || 0} onBlur={(e) => setPrice(+e.target.value)} />
           </div>
         </div>
+
         <div className="card">
           <h3>{t('students.tree')}</h3>
           <TreeView tree={s.tree} />
         </div>
+
         <div className="card">
           <h3>{t('students.balanceTitle')} <span style={{ color: s.balance < 0 ? 'var(--danger)' : 'var(--primary)' }}>{s.balance}</span></h3>
           <div className="row">
@@ -126,16 +142,28 @@ export function TeacherStudentDetails() {
             <button className="btn btn-primary" onClick={doTopup} disabled={topping}>{topping ? '…' : t('btn.topup')}</button>
           </div>
           <div className="h-divider" />
-          <h3>{t('students.history')}</h3>
-          <div className="list" style={{ maxHeight: 260, overflowY: 'auto' }}>
-            {s.payments.map((p: any) => (
-              <div key={p.id} className="list-item">
-                <div>{p.kind === 'TOPUP' ? '+ ' : p.kind === 'CHARGE' ? '− ' : ''}{p.amount}</div>
-                <div className="muted" style={{ fontSize: 12 }}>{new Date(p.createdAt).toLocaleString()}</div>
-              </div>
-            ))}
+          <h4 style={{ margin: '0 0 8px', fontSize: 13 }}>{t('students.history')}</h4>
+          <div className="payment-history">
+            {(s.payments || []).length === 0 && <div className="empty" style={{ padding: '12px 0' }}>—</div>}
+            {(s.payments || []).map((p: any) => {
+              const kind = p.kind;
+              const sign = kind === 'TOPUP' ? '+' : kind === 'CHARGE' ? '−' : '±';
+              const color = kind === 'TOPUP' ? 'var(--success)' : kind === 'CHARGE' ? 'var(--danger)' : 'var(--text-muted)';
+              const label = kind === 'TOPUP' ? 'Поступление' : kind === 'CHARGE' ? 'Списание' : 'Корректировка';
+              return (
+                <div key={p.id} className="payment-row">
+                  <div className="payment-amount" style={{ color }}>{sign}{p.amount}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="payment-label">{label}</div>
+                    {p.comment && <div className="payment-comment muted">{p.comment}</div>}
+                  </div>
+                  <div className="muted" style={{ fontSize: 11 }}>{new Date(p.createdAt).toLocaleString()}</div>
+                </div>
+              );
+            })}
           </div>
         </div>
+
         <div className="card">
           <h3>{t('students.courseAccess')}</h3>
           <div className="list">
@@ -151,23 +179,94 @@ export function TeacherStudentDetails() {
       </div>
 
       <StudentCalendarCard student={s} />
+
+      {editProfileOpen && (
+        <EditProfileModal student={s} onClose={(saved: boolean) => { setEditProfileOpen(false); if (saved) load(); }} />
+      )}
     </Shell>
   );
 }
 
-/* ============================================================
-   StudentCalendarCard — embedded month calendar with this
-   student's lessons + teacher's free slots. Click a future day
-   to add a free slot or a lesson with this student in one place.
-   ============================================================ */
+function ProfRow({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="profile-row">
+      <span className="profile-label">{label}</span>
+      <span className="profile-value">{value || '—'}</span>
+    </div>
+  );
+}
 
+function EditProfileModal({ student, onClose }: any) {
+  const { t } = useT();
+  const u = student.user || {};
+  const [form, setForm] = useState({
+    fullName: u.fullName || '',
+    email: u.email || '',
+    phone: u.phone || '',
+    telegram: u.telegram || '',
+    whatsapp: u.whatsapp || '',
+    instagram: u.instagram || '',
+    website: u.website || '',
+    city: u.city || '',
+    goal: u.goal || '',
+    bio: u.bio || '',
+    password: '',
+  });
+  const [saving, setSaving] = useState(false);
+  function up(k: string, v: any) { setForm((f) => ({ ...f, [k]: v })); }
+
+  async function save() {
+    setSaving(true);
+    try {
+      const payload: any = { ...form };
+      if (!payload.password) delete payload.password;
+      await api.patch(`/students/${student.id}/profile`, payload);
+      toast.success(t('profile.updated'));
+      onClose(true);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || t('toast.notSaved'));
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <Modal open onClose={() => onClose(false)} title={t('profile.editBtn')} width={620}
+      footer={<><button className="btn" onClick={() => onClose(false)}>{t('btn.cancel')}</button><button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? t('status.saving') : t('profile.saveBtn')}</button></>}>
+      <div className="field"><label>{t('profile.fullName')}</label><input className="input" value={form.fullName} onChange={(e) => up('fullName', e.target.value)} /></div>
+      <div className="row">
+        <div className="field"><label>{t('profile.email')}</label><input className="input" type="email" value={form.email} onChange={(e) => up('email', e.target.value)} /></div>
+        <div className="field"><label>{t('profile.phone')}</label><input className="input" value={form.phone} onChange={(e) => up('phone', e.target.value)} /></div>
+      </div>
+      <div className="row">
+        <div className="field"><label>{t('profile.telegram')}</label><input className="input" value={form.telegram} onChange={(e) => up('telegram', e.target.value)} /></div>
+        <div className="field"><label>{t('profile.whatsapp')}</label><input className="input" value={form.whatsapp} onChange={(e) => up('whatsapp', e.target.value)} /></div>
+      </div>
+      <div className="row">
+        <div className="field"><label>{t('profile.instagram')}</label><input className="input" value={form.instagram} onChange={(e) => up('instagram', e.target.value)} /></div>
+        <div className="field"><label>{t('profile.website')}</label><input className="input" value={form.website} onChange={(e) => up('website', e.target.value)} /></div>
+      </div>
+      <div className="field"><label>{t('profile.city')}</label><input className="input" value={form.city} onChange={(e) => up('city', e.target.value)} /></div>
+      <div className="field"><label>{t('profile.goal')}</label><input className="input" value={form.goal} onChange={(e) => up('goal', e.target.value)} /></div>
+      <div className="field"><label>{t('profile.bio')}</label><textarea className="textarea" value={form.bio} onChange={(e) => up('bio', e.target.value)} /></div>
+      <div className="h-divider" />
+      <div className="field"><label>{t('auth.passwordNew')} ({t('common.optional')})</label>
+        <input className="input" type="text" value={form.password} onChange={(e) => up('password', e.target.value)} placeholder="оставьте пустым чтобы не менять" />
+      </div>
+    </Modal>
+  );
+}
+
+/* ============================================================
+   StudentCalendarCard — only shows lessons of THIS student.
+   Click future day → directly add a lesson with this student
+   (no "free slot" option — those are global, not per-student).
+   ============================================================ */
 function StudentCalendarCard({ student }: { student: any }) {
   const { t } = useT();
   const [month, setMonth] = useState(new Date());
   const [data, setData] = useState<any>({ lessons: [], freeSlots: [], events: [] });
   const [pickedDay, setPickedDay] = useState<Date | null>(null);
   const [pickedEvent, setPickedEvent] = useState<any>(null);
-  const [creating, setCreating] = useState<'free' | 'lesson' | null>(null);
+  const [creatingLesson, setCreatingLesson] = useState(false);
 
   function load() {
     const from = new Date(month.getFullYear(), month.getMonth() - 1, 1).toISOString();
@@ -175,7 +274,6 @@ function StudentCalendarCard({ student }: { student: any }) {
     api.get('/calendar', { params: { from, to } })
       .then((r) => setData(r.data))
       .catch(() => {
-        // Silent retry once for cold-start
         setTimeout(() => {
           api.get('/calendar', { params: { from, to } })
             .then((r) => setData(r.data))
@@ -185,36 +283,24 @@ function StudentCalendarCard({ student }: { student: any }) {
   }
   useEffect(load, [month]);
 
-  // Show only events relevant to this student: their lessons + all free slots
-  // (the student could potentially be moved to any free window).
   const events: CalEvent[] = useMemo(() => {
     const now = new Date();
-    const studentLessons = data.lessons.filter((l: any) => l.studentProfileId === student.id);
-    return [
-      ...studentLessons.map((l: any) => ({
+    return data.lessons
+      .filter((l: any) => l.studentProfileId === student.id)
+      .map((l: any) => ({
         id: 'L' + l.id,
         title: student.user.fullName,
         startAt: l.startAt,
         variant: l.status === 'COMPLETED' ? 'completed' : (new Date(l.startAt) < now ? 'past' : 'lesson'),
-      })),
-      ...data.freeSlots.map((sl: any) => ({
-        id: 'F' + sl.id,
-        title: t('calendar.freeShort'),
-        startAt: sl.startAt,
-        variant: 'free' as const,
-      })),
-    ];
-  }, [data, student, t]);
+      }));
+  }, [data, student]);
 
-  /** Drag-drop: move lesson/slot to another day, optimistic. */
   async function handleEventMove(eventId: string, targetDay: Date) {
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
     if (targetDay < todayStart) { toast.warning(t('toast.error')); return; }
-    const prefix = eventId[0];
+    if (!eventId.startsWith('L')) return;
     const id = eventId.slice(1);
-    const arr = prefix === 'L' ? 'lessons' : 'freeSlots';
-    const url = prefix === 'L' ? `/calendar/lessons/${id}` : `/calendar/free-slots/${id}`;
-    const item = (data as any)[arr].find((x: any) => x.id === id);
+    const item = data.lessons.find((x: any) => x.id === id);
     if (!item) return;
     const old = new Date(item.startAt);
     if (isSameDay(old, targetDay)) return;
@@ -224,10 +310,10 @@ function StudentCalendarCard({ student }: { student: any }) {
     const prev = data;
     setData((d: any) => ({
       ...d,
-      [arr]: d[arr].map((x: any) => x.id === id ? { ...x, startAt: newDate.toISOString() } : x),
+      lessons: d.lessons.map((x: any) => x.id === id ? { ...x, startAt: newDate.toISOString() } : x),
     }));
     try {
-      await api.patch(url, { startAt: newDate.toISOString() });
+      await api.patch(`/calendar/lessons/${id}`, { startAt: newDate.toISOString() });
       toast.success(t('calendar.movedTo'));
     } catch {
       setData(prev);
@@ -251,25 +337,19 @@ function StudentCalendarCard({ student }: { student: any }) {
       <ResponsiveCalendar
         month={month}
         events={events}
-        onDayClick={(d) => { setPickedDay(d); setCreating(null); }}
+        onDayClick={(d) => { setPickedDay(d); setCreatingLesson(false); }}
         onEventClick={(ev) => setPickedEvent(ev)}
         onEventMove={handleEventMove}
       />
 
-      {pickedDay && !creating && (
-        <Modal open onClose={() => setPickedDay(null)} title={pickedDay.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })} width={460}>
-          <div className="flex-col">
-            <button className="btn btn-primary" onClick={() => setCreating('free')}>{t('btn.createFreeSlot')}</button>
-            <button className="btn" onClick={() => setCreating('lesson')}>{t('btn.createLesson')}</button>
-          </div>
+      {pickedDay && !creatingLesson && (
+        <Modal open onClose={() => setPickedDay(null)} title={pickedDay.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })} width={420}>
+          <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => setCreatingLesson(true)}>{t('btn.createLesson')}</button>
         </Modal>
       )}
 
-      {pickedDay && creating === 'free' && (
-        <FreeSlotMini day={pickedDay} onClose={(saved: boolean) => { setPickedDay(null); setCreating(null); if (saved) load(); }} />
-      )}
-      {pickedDay && creating === 'lesson' && (
-        <LessonMini day={pickedDay} student={student} onClose={(saved: boolean) => { setPickedDay(null); setCreating(null); if (saved) load(); }} />
+      {pickedDay && creatingLesson && (
+        <LessonMini day={pickedDay} student={student} onClose={(saved: boolean) => { setPickedDay(null); setCreatingLesson(false); if (saved) load(); }} />
       )}
 
       {pickedEvent && pickedEvent.id.startsWith('L') && (
@@ -278,39 +358,7 @@ function StudentCalendarCard({ student }: { student: any }) {
           onClose={(refresh: boolean) => { setPickedEvent(null); if (refresh) load(); }}
         />
       )}
-      {pickedEvent && pickedEvent.id.startsWith('F') && (
-        <FreeSlotInfo
-          slot={data.freeSlots.find((sl: any) => 'F' + sl.id === pickedEvent.id)}
-          onClose={(refresh: boolean) => { setPickedEvent(null); if (refresh) load(); }}
-        />
-      )}
     </div>
-  );
-}
-
-function FreeSlotMini({ day, onClose }: any) {
-  const { t } = useT();
-  const [timeFrom, setTimeFrom] = useState('12:00');
-  const [timeTo, setTimeTo] = useState('13:00');
-  const [saving, setSaving] = useState(false);
-  async function save() {
-    const dt = combineDayTime(day, timeFrom);
-    const durationMin = durationFromTimes(timeFrom, timeTo);
-    setSaving(true);
-    try {
-      await api.post('/calendar/free-slots', { startAt: dt.toISOString(), durationMin });
-      toast.success(t('calendar.slotCreated'));
-      onClose(true);
-    } catch { toast.error(t('toast.notCreated')); } finally { setSaving(false); }
-  }
-  return (
-    <Modal open onClose={() => onClose(false)} title={t('calendar.free')}
-      footer={<><button className="btn" onClick={() => onClose(false)}>{t('btn.cancel')}</button><button className="btn btn-primary" onClick={save} disabled={saving}>{t('btn.create')}</button></>}>
-      <div className="row">
-        <div className="field"><label>{t('calendar.timeFrom')}</label><input className="input" type="time" value={timeFrom} onChange={(e) => setTimeFrom(e.target.value)} /></div>
-        <div className="field"><label>{t('calendar.timeTo')}</label><input className="input" type="time" value={timeTo} onChange={(e) => setTimeTo(e.target.value)} /></div>
-      </div>
-    </Modal>
   );
 }
 
@@ -379,29 +427,6 @@ function LessonInfo({ lesson, onClose }: any) {
         <button className="btn btn-primary" onClick={complete} disabled={lesson.status === 'COMPLETED'}>
           {lesson.status === 'COMPLETED' ? t('btn.alreadyCompleted') : t('btn.markComplete')}
         </button>
-      </div>
-    </Modal>
-  );
-}
-
-function FreeSlotInfo({ slot, onClose }: any) {
-  const { t } = useT();
-  if (!slot) return null;
-  async function del() {
-    const ok = await confirmDialog({ title: t('calendar.confirmDeleteSlot'), danger: true, okLabel: t('btn.delete') });
-    if (!ok) return;
-    try {
-      await api.delete(`/calendar/free-slots/${slot.id}`);
-      toast.success(t('calendar.slotDeleted'));
-      onClose(true);
-    } catch { toast.error(t('toast.notDeleted')); }
-  }
-  return (
-    <Modal open onClose={() => onClose(false)} title={t('calendar.free')}>
-      <p>{new Date(slot.startAt).toLocaleString()} · {slot.durationMin} {t('misc.duration60')}</p>
-      {slot.takenName && <p className="muted">{t('calendar.bookedBy')}: {slot.takenName}</p>}
-      <div className="modal-actions">
-        <button className="btn btn-danger" onClick={del}>{t('btn.delete')}</button>
       </div>
     </Modal>
   );

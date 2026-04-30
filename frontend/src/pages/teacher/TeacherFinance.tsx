@@ -79,23 +79,41 @@ export function TeacherFinance() {
     if (!data || !reportRef.current) return;
     setGenerating(true);
     try {
-      // Lazy-load PDF deps so the main bundle stays small
       const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
         import('jspdf'),
         import('html2canvas'),
       ]);
 
       const node = reportRef.current;
+      // Render off-screen but visible to layout engine — html2canvas needs real layout.
       node.style.display = 'block';
-      await new Promise((r) => requestAnimationFrame(() => r(null)));
+      node.style.position = 'fixed';
+      node.style.left = '-10000px';
+      node.style.top = '0';
+      node.style.zIndex = '-1';
+      // Wait for two frames so the browser actually paints the off-screen node.
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null))));
 
       const canvas = await html2canvas(node, {
         scale: 2,
         backgroundColor: '#ffffff',
         useCORS: true,
         logging: false,
+        windowWidth: 794,
+        width: node.scrollWidth || 794,
+        height: node.scrollHeight,
       });
+
+      // Restore styles
       node.style.display = 'none';
+      node.style.position = '';
+      node.style.left = '';
+      node.style.top = '';
+      node.style.zIndex = '';
+
+      if (!canvas || !canvas.width || !canvas.height) {
+        throw new Error('empty canvas');
+      }
 
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
@@ -120,7 +138,7 @@ export function TeacherFinance() {
       setPdfPreview({ url, filename });
     } catch (e: any) {
       console.error('[exportPdf]', e);
-      toast.error(t('pdf.notGenerated'));
+      toast.error(`${t('pdf.notGenerated')}: ${e?.message || 'unknown'}`);
     } finally {
       setGenerating(false);
     }
@@ -196,13 +214,7 @@ export function TeacherFinance() {
         {incomeByDay.entries.length === 0 ? (
           <div className="empty">{t('empty.noPayments')}</div>
         ) : (
-          <div className="fin-bars">
-            {incomeByDay.entries.map(([d, v]) => (
-              <div key={d} className="bar"
-                style={{ height: `${Math.max(3, (v / incomeByDay.max) * 100)}%` }}
-                title={`${d}: ${v.toLocaleString()} ${cur}`} />
-            ))}
-          </div>
+          <FinChart entries={incomeByDay.entries} max={incomeByDay.max} cur={cur} />
         )}
       </div>
 
@@ -266,6 +278,49 @@ export function TeacherFinance() {
 
       {pdfPreview && <PdfPreviewModal preview={pdfPreview} onClose={closePdfPreview} />}
     </Shell>
+  );
+}
+
+function FinChart({ entries, max, cur }: { entries: [string, number][]; max: number; cur: string }) {
+  const [hover, setHover] = useState<{ idx: number; x: number; y: number } | null>(null);
+  const total = entries.reduce((s, [, v]) => s + v, 0);
+  const avg = entries.length ? Math.round(total / entries.length) : 0;
+  function fmtDay(s: string) {
+    // s = "YYYY-MM-DD"
+    const d = new Date(s + 'T00:00');
+    return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  }
+  return (
+    <div className="fin-chart">
+      <div className="fin-chart-stats">
+        <span><strong>{total.toLocaleString()}</strong> {cur}</span>
+        <span className="muted">·</span>
+        <span className="muted">средн. {avg.toLocaleString()} {cur}/день</span>
+        <span className="muted">·</span>
+        <span className="muted">{entries.length} дн</span>
+      </div>
+      <div className="fin-chart-body">
+        {entries.map(([d, v], idx) => {
+          const h = Math.max(3, (v / max) * 100);
+          return (
+            <div key={d} className="fin-chart-col"
+              onMouseEnter={(e) => setHover({ idx, x: e.currentTarget.offsetLeft, y: e.currentTarget.offsetTop })}
+              onMouseLeave={() => setHover(null)}>
+              <div className="fin-chart-bar-wrap">
+                <div className="fin-chart-bar" style={{ height: `${h}%` }} />
+              </div>
+              <div className="fin-chart-label">{fmtDay(d)}</div>
+            </div>
+          );
+        })}
+        {hover && (
+          <div className="fin-chart-tooltip" style={{ left: hover.x, top: hover.y }}>
+            <div style={{ fontWeight: 600 }}>{entries[hover.idx][1].toLocaleString()} {cur}</div>
+            <div className="muted" style={{ fontSize: 11 }}>{fmtDay(entries[hover.idx][0])}</div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

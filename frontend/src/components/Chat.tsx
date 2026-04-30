@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { api } from '../api';
+import { api, getCached, setCached } from '../api';
 import { useAuth, toast } from '../store';
 import { io, Socket } from 'socket.io-client';
 import { useT } from '../i18n';
@@ -41,15 +41,21 @@ interface Props {
 export function ChatPanel({ autoOpenWithUserId }: Props = {}) {
   const { t } = useT();
   const { user } = useAuth();
-  const [chats, setChats] = useState<any[]>([]);
+  // Show cached chats instantly on revisit (SWR-style) — no spinner.
+  const [chats, setChats] = useState<any[]>(() => (getCached<any[]>('/chat') || []));
+  const [chatsLoading, setChatsLoading] = useState<boolean>(() => !getCached<any[]>('/chat'));
   const [active, setActive] = useState<string | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [text, setText] = useState('');
   const [opening, setOpening] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const loadChats = useCallback(() => {
-    return api.get('/chat').then((r) => setChats(r.data)).catch(() => toast.error(t('chat.notLoadedChats')));
+    return api.get('/chat')
+      .then((r) => { setChats(r.data); setCached('/chat', undefined, r.data); })
+      .catch(() => { /* silent first try; toast only on persistent failure */ })
+      .finally(() => setChatsLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -96,7 +102,14 @@ export function ChatPanel({ autoOpenWithUserId }: Props = {}) {
   // Load messages + join room when active changes
   useEffect(() => {
     if (!active || !user) return;
-    api.get(`/chat/${active}/messages`).then((r) => setMessages(r.data)).catch(() => toast.error(t('chat.notLoadedMessages')));
+    // Instant render from cache if we have it, then revalidate.
+    const cached = getCached<any[]>(`/chat/${active}/messages`);
+    if (cached) setMessages(cached);
+    setMessagesLoading(!cached);
+    api.get(`/chat/${active}/messages`)
+      .then((r) => { setMessages(r.data); setCached(`/chat/${active}/messages`, undefined, r.data); })
+      .catch(() => toast.error(t('chat.notLoadedMessages')))
+      .finally(() => setMessagesLoading(false));
     const s = getSocket(user.id);
     s.emit('chat:join', active);
   }, [active, user]);
@@ -149,20 +162,33 @@ export function ChatPanel({ autoOpenWithUserId }: Props = {}) {
         <div style={{ padding: 12, borderBottom: '1px solid var(--border)' }}>
           <button className="btn btn-sm" style={{ width: '100%' }} onClick={openSupport}>{t('btn.support')}</button>
         </div>
-        {chats.map((c) => {
-          const other = c.members.find((m: any) => m.userId !== user?.id);
-          const title = c.title || other?.user?.fullName || t('chat.title');
-          const last = c.messages[0];
-          return (
-            <div key={c.id} className={`chat-list-item ${active === c.id ? 'active' : ''}`} onClick={() => setActive(c.id)}>
-              <div style={{ fontWeight: 500 }}>{title}</div>
-              <div className="muted" style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {last?.text || (last ? t('chat.attachment') : t('chat.noMessages'))}
+        {chatsLoading && chats.length === 0 ? (
+          <div style={{ padding: 12 }}>
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} style={{ padding: 12, borderBottom: '1px solid var(--border)' }}>
+                <div className="skeleton" style={{ height: 14, width: '60%', marginBottom: 6 }} />
+                <div className="skeleton" style={{ height: 10, width: '85%' }} />
               </div>
-            </div>
-          );
-        })}
-        {chats.length === 0 && <div className="empty">{t('empty.noChats')}</div>}
+            ))}
+          </div>
+        ) : (
+          <>
+            {chats.map((c) => {
+              const other = c.members.find((m: any) => m.userId !== user?.id);
+              const title = c.title || other?.user?.fullName || t('chat.title');
+              const last = c.messages[0];
+              return (
+                <div key={c.id} className={`chat-list-item ${active === c.id ? 'active' : ''}`} onClick={() => setActive(c.id)}>
+                  <div style={{ fontWeight: 500 }}>{title}</div>
+                  <div className="muted" style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {last?.text || (last ? t('chat.attachment') : t('chat.noMessages'))}
+                  </div>
+                </div>
+              );
+            })}
+            {chats.length === 0 && <div className="empty">{t('empty.noChats')}</div>}
+          </>
+        )}
       </div>
 
       <div className="chat-pane">
@@ -182,6 +208,13 @@ export function ChatPanel({ autoOpenWithUserId }: Props = {}) {
               </div>
             </div>
             <div className="chat-messages" ref={scrollRef}>
+              {messagesLoading && messages.length === 0 && (
+                <div style={{ padding: 8 }}>
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="skeleton" style={{ height: 36, width: i === 1 ? '70%' : '55%', marginBottom: 10, alignSelf: i === 1 ? 'flex-end' : 'flex-start' }} />
+                  ))}
+                </div>
+              )}
               {messages.map((m) => (
                 <div key={m.id} className={`chat-msg ${m.senderId === user?.id ? 'mine' : ''} ${m.__optimistic ? 'sending' : ''}`}>
                   {m.senderId !== user?.id && <div style={{ fontSize: 11, fontWeight: 500, opacity: 0.7 }}>{m.sender?.fullName}</div>}

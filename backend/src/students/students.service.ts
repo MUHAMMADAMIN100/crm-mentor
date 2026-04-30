@@ -17,8 +17,11 @@ export class StudentsService {
 
   async createStudent(
     teacherId: string,
-    data: { fullName: string; login: string; password: string; individualPrice?: number },
+    data: any,
   ) {
+    if (!data?.login || !data?.password || !data?.fullName) {
+      throw new BadRequestException('Заполните ФИО, логин и пароль');
+    }
     const exists = await this.prisma.user.findUnique({ where: { login: data.login } });
     if (exists) throw new BadRequestException('Логин уже занят');
     const hash = await AuthService.hashPassword(data.password);
@@ -28,10 +31,25 @@ export class StudentsService {
         password: hash,
         role: 'STUDENT',
         fullName: data.fullName,
+        // Teacher sets a permanent password right away — no forced reset on first login.
+        mustChangePassword: false,
+        // Optional profile fields — teacher can fill them when creating a student.
+        email: data.email || null,
+        phone: data.phone || null,
+        telegram: data.telegram || null,
+        whatsapp: data.whatsapp || null,
+        instagram: data.instagram || null,
+        website: data.website || null,
+        goal: data.goal || null,
+        bio: data.bio || null,
+        city: data.city || null,
+        // Treat the profile as completed so the student lands on dashboard, not on the wizard.
+        profileCompleted: !!(data.email || data.phone || data.telegram),
         studentProfile: {
           create: {
             teacherId,
             individualPrice: data.individualPrice ?? null,
+            allowReschedule: !!data.allowReschedule,
             tree: { create: {} },
           },
         },
@@ -89,6 +107,30 @@ export class StudentsService {
         individualPrice: data.individualPrice ?? undefined,
       },
     });
+  }
+
+  /** Teacher edits the personal profile fields of one of their own students. */
+  async updateStudentProfile(teacherId: string, profileId: string, data: any) {
+    const sp = await this.prisma.studentProfile.findUnique({ where: { id: profileId } });
+    if (!sp || sp.teacherId !== teacherId) throw new ForbiddenException();
+    const updated = await this.prisma.user.update({
+      where: { id: sp.userId },
+      data: {
+        fullName: data.fullName ?? undefined,
+        email: data.email ?? undefined,
+        phone: data.phone ?? undefined,
+        telegram: data.telegram ?? undefined,
+        whatsapp: data.whatsapp ?? undefined,
+        instagram: data.instagram ?? undefined,
+        website: data.website ?? undefined,
+        city: data.city ?? undefined,
+        goal: data.goal ?? undefined,
+        bio: data.bio ?? undefined,
+        ...(data.password ? { password: await AuthService.hashPassword(data.password), mustChangePassword: false } : {}),
+      },
+    });
+    const { password, ...rest } = updated as any;
+    return rest;
   }
 
   async archive(teacherId: string, profileId: string) {

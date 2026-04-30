@@ -34,6 +34,12 @@ export class StudentsController {
   }
 
   @Roles('TEACHER')
+  @Patch(':id/profile')
+  updateProfile(@CurrentUser() u, @Param('id') id: string, @Body() body: any) {
+    return this.svc.updateStudentProfile(u.id, id, body);
+  }
+
+  @Roles('TEACHER')
   @Patch(':id/archive')
   archive(@CurrentUser() u, @Param('id') id: string) {
     return this.svc.archive(u.id, id);

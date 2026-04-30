@@ -217,3 +217,21 @@
 @media (max-width: 720px) {
   .ai-suggestions { grid-template-columns: 1fr; }
 }
+
+/* Compact AI header on phones — single-line title, hidden subtitle, smaller pill */
+@media (max-width: 640px) {
+  .ai-header { padding: 12px 14px; gap: 10px; flex-wrap: wrap; }
+  .ai-avatar { width: 36px; height: 36px; border-radius: 10px; }
+  .ai-avatar svg { width: 20px; height: 20px; }
+  .ai-title { font-size: 15px; }
+  .ai-subtitle { display: none; }
+  .ai-model-pill {
+    padding: 4px 10px;
+    font-size: 11px;
+    margin-left: 0;
+    flex-shrink: 0;
+  }
+  .ai-model-pill .dot { width: 5px; height: 5px; }
+  .ai-header-actions { gap: 6px; }
+  .ai-clear-btn { width: 30px; height: 30px; }
+}
