@@ -1110,6 +1110,35 @@ main.content { max-width: 100%; overflow-x: hidden; }
   box-shadow: 0 0 0 2px var(--primary-200);
 }
 
+/* Public booking: highlight days with available slots, grey out the rest */
+.cal-day.has-slots {
+  background: linear-gradient(180deg, var(--primary-50) 0%, #fff 100%);
+  border-color: var(--primary-200);
+  cursor: pointer;
+}
+.cal-day.has-slots:hover {
+  border-color: var(--primary);
+  box-shadow: 0 6px 16px rgba(124, 58, 237, 0.18);
+  transform: translateY(-1px);
+}
+.cal-day.has-slots .num {
+  color: var(--primary-700);
+  font-weight: 700;
+}
+.cal-day.no-slots:not(.past-day) {
+  background: var(--surface-2);
+  opacity: 0.55;
+  cursor: default;
+}
+.cal-day.no-slots:not(.past-day):hover {
+  border-color: var(--border);
+  box-shadow: none;
+  transform: none;
+}
+.cal-day.no-slots:not(.past-day) .num {
+  color: var(--text-muted);
+}
+
 /* Past days: greyed out, not clickable, no hover effect */
 .cal-day.past-day {
   background: var(--surface-2);
