@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Shell } from '../../components/Shell';
 import { Loading } from '../../components/Loading';
 import { api } from '../../api';
+import { useT } from '../../i18n';
 
 export function NotesPage() {
+  const { t } = useT();
   const [body, setBody] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string>('');
   const [saving, setSaving] = useState(false);
@@ -16,28 +18,28 @@ export function NotesPage() {
   useEffect(() => {
     if (body === null) return;
     if (firstLoad.current) { firstLoad.current = false; return; }
-    const t = setTimeout(async () => {
+    const tt = setTimeout(async () => {
       setSaving(true);
       try {
         await api.put('/notes', { body });
-        setSavedAt(new Date().toLocaleTimeString('ru-RU'));
+        setSavedAt(new Date().toLocaleTimeString());
       } finally {
         setSaving(false);
       }
     }, 500);
-    return () => clearTimeout(t);
+    return () => clearTimeout(tt);
   }, [body]);
 
   return (
-    <Shell title="Заметки">
+    <Shell title={t('notes.title')}>
       {body === null ? (
-        <Loading label="Открываем ваши заметки…" />
+        <Loading label={t('notes.openingFor')} />
       ) : (
         <div className="card notes-card">
           <h3 style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            Личные заметки
+            {t('notes.personal')}
             <span className="muted" style={{ fontSize: 12, fontWeight: 400 }}>
-              {saving ? 'сохраняем…' : savedAt ? `сохранено в ${savedAt}` : 'автосохранение'}
+              {saving ? t('status.saving') : savedAt ? `${t('status.savedAt')} ${savedAt}` : t('status.autosave')}
             </span>
           </h3>
           <textarea
@@ -45,10 +47,10 @@ export function NotesPage() {
             maxLength={1000}
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            placeholder="Здесь можно записывать всё что нужно — план занятий, идеи, дела, контакты…"
+            placeholder={t('notes.placeholder')}
           />
           <div className="muted" style={{ fontSize: 11, marginTop: 6, textAlign: 'right' }}>
-            {body.length}/1000 символов
+            {body.length}/1000
           </div>
         </div>
       )}

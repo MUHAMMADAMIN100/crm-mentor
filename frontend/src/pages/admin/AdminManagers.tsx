@@ -1,11 +1,13 @@
 import { Shell } from '../../components/Shell';
+import { useT } from '../../i18n';
 
 export function AdminManagers() {
+  const { t } = useT();
   return (
-    <Shell title="Менеджеры">
+    <Shell title={t('nav.managers')}>
       <div className="card">
-        <h3>Менеджерские аккаунты</h3>
-        <p className="muted">Появятся в следующей версии Miz, когда платформа будет доступна онлайн-школам.</p>
+        <h3>{t('nav.managers')}</h3>
+        <p className="muted">—</p>
       </div>
     </Shell>
   );

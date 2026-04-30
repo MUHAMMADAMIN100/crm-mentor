@@ -528,6 +528,56 @@ main.content > .miz-loader {
 .cal-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
 .cal-month { font-weight: 600; min-width: 160px; text-align: center; }
 
+/* ---------- Language picker in topbar ---------- */
+.lang-picker { position: relative; }
+.lang-trigger {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 500; font-size: 13px;
+  color: var(--text);
+  transition: 0.15s;
+}
+.lang-trigger:hover { background: var(--primary-50); border-color: var(--primary-200); }
+.lang-trigger .lang-flag { font-size: 16px; line-height: 1; }
+.lang-trigger .lang-code { font-weight: 600; letter-spacing: 0.02em; }
+.lang-trigger svg { opacity: 0.6; }
+
+.lang-menu {
+  position: absolute;
+  right: 0; top: calc(100% + 6px);
+  min-width: 170px;
+  padding: 6px;
+  z-index: 200;
+  animation: miz-fade-up 0.18s ease-out both;
+}
+.lang-option {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text);
+  text-align: left;
+  transition: 0.15s;
+}
+.lang-option .lang-flag { font-size: 18px; }
+.lang-option:hover { background: var(--surface-2); }
+.lang-option.active { background: var(--primary-50); color: var(--primary-700); font-weight: 500; }
+.lang-option svg { margin-left: auto; color: var(--primary); }
+
+@media (max-width: 640px) {
+  .lang-trigger { padding: 6px 8px; }
+  .lang-trigger .lang-code { display: none; }
+  .user-name-label { display: none; }
+}
+
 /* ---------- Avatar dropdown menu ---------- */
 .avatar-menu {
   position: absolute;

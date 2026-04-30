@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
+import { useT } from '../i18n';
 
 /**
  * Inline auto-saving notes widget. Used on home pages of all roles.
  * Backend endpoint: GET/PUT /notes (per-user, max 1000 chars).
  */
 export function NotesCard({ minHeight = 160 }: { minHeight?: number }) {
+  const { t } = useT();
   const [body, setBody] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string>('');
   const [saving, setSaving] = useState(false);
@@ -38,10 +40,10 @@ export function NotesCard({ minHeight = 160 }: { minHeight?: number }) {
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
             <polyline points="14 2 14 8 20 8" />
           </svg>
-          Заметки
+          {t('notes.title')}
         </span>
         <span className="muted" style={{ fontSize: 11, fontWeight: 400 }}>
-          {body === null ? 'открываем…' : saving ? 'сохраняем…' : savedAt ? `сохр. в ${savedAt}` : 'автосохранение'}
+          {body === null ? t('notes.opening') : saving ? t('status.saving') : savedAt ? `${t('status.savedAt')} ${savedAt}` : t('status.autosave')}
         </span>
       </h3>
       <textarea
@@ -49,7 +51,7 @@ export function NotesCard({ minHeight = 160 }: { minHeight?: number }) {
         maxLength={1000}
         value={body ?? ''}
         onChange={(e) => setBody(e.target.value)}
-        placeholder="Записывайте идеи, планы, важные мысли…"
+        placeholder={t('notes.placeholder')}
         disabled={body === null}
         style={{ minHeight }}
       />

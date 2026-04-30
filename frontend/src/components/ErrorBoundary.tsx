@@ -1,4 +1,5 @@
 import { Component, ReactNode } from 'react';
+import { t } from '../i18n';
 
 interface State { error: Error | null; }
 
@@ -36,13 +37,13 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
               <line x1="12" y1="17" x2="12.01" y2="17" />
             </svg>
           </div>
-          <h1 style={{ fontSize: 20, margin: '0 0 8px' }}>Что-то пошло не так</h1>
+          <h1 style={{ fontSize: 20, margin: '0 0 8px' }}>{t('err.title')}</h1>
           <p style={{ color: 'var(--text-soft)', margin: '0 0 18px', fontSize: 14 }}>
-            В приложении произошла непредвиденная ошибка. Попробуйте обновить страницу.
+            {t('err.body')}
           </p>
           {this.state.error?.message && (
             <details style={{ textAlign: 'left', marginBottom: 18, fontSize: 12, color: 'var(--text-muted)' }}>
-              <summary style={{ cursor: 'pointer' }}>Подробности</summary>
+              <summary style={{ cursor: 'pointer' }}>{t('err.details')}</summary>
               <pre style={{
                 whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                 background: 'var(--surface-2)', padding: 8, borderRadius: 8, marginTop: 8,
@@ -50,7 +51,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
             </details>
           )}
           <button className="btn btn-primary" style={{ width: '100%' }} onClick={this.reset}>
-            Обновить страницу
+            {t('btn.refresh')}
           </button>
         </div>
       </div>

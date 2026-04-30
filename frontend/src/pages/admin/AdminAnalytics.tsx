@@ -1,11 +1,23 @@
 import { Shell } from '../../components/Shell';
 import { useApi } from '../../hooks';
 import { SkeletonGrid } from '../../components/Skeleton';
+import { useT } from '../../i18n';
 
 export function AdminAnalytics() {
+  const { t } = useT();
   const { data: stats, loading } = useApi<any>('/admin/analytics');
+  function labelOf(k: string) {
+    const map: Record<string, string> = {
+      teachers: t('nav.teachers'),
+      students: t('nav.students'),
+      courses: t('nav.courses'),
+      lessonsCompleted: t('lesson.COMPLETED'),
+      homeworkDone: t('hw.COMPLETED'),
+    };
+    return map[k] || k;
+  }
   return (
-    <Shell title="Аналитика">
+    <Shell title={t('nav.analytics')}>
       {!stats && loading ? <SkeletonGrid count={5} /> : (
         <div className="cards-grid">
           {Object.entries(stats || {}).map(([k, v]) => (
@@ -19,9 +31,3 @@ export function AdminAnalytics() {
     </Shell>
   );
 }
-
-const LABELS: Record<string, string> = {
-  teachers: 'Учителей', students: 'Учеников', courses: 'Курсов',
-  lessonsCompleted: 'Проведено уроков', homeworkDone: 'Выполнено ДЗ',
-};
-function labelOf(k: string) { return LABELS[k] || k; }

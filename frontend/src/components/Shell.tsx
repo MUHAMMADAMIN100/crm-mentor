@@ -171,7 +171,8 @@ export function Shell({ title, children, showBack }: { title: string; children: 
             <div className="title">{title}</div>
           </div>
           <div className="right">
-            <span className="muted" style={{ fontSize: 13 }}>{user.fullName}</span>
+            <LangPicker lang={lang} setLang={setLang} />
+            <span className="muted user-name-label" style={{ fontSize: 13 }}>{user.fullName}</span>
             <div ref={menuRef} style={{ position: 'relative' }}>
               <div className="avatar" onClick={() => setMenuOpen((v) => !v)} aria-label={t('nav.userMenu')}>
                 {user.fullName?.[0]?.toUpperCase() || 'U'}
@@ -181,21 +182,6 @@ export function Shell({ title, children, showBack }: { title: string; children: 
                   <button className="btn btn-ghost" style={{ width: '100%', textAlign: 'left' }} onClick={() => { setMenuOpen(false); nav('/profile'); }}>{t('menu.profile')}</button>
                   <button className="btn btn-ghost" style={{ width: '100%', textAlign: 'left' }} onClick={() => { setMenuOpen(false); nav('/settings'); }}>{t('menu.settings')}</button>
                   <div className="h-divider" />
-                  <div className="muted" style={{ fontSize: 11, padding: '2px 12px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{t('menu.language')}</div>
-                  <div style={{ display: 'flex', gap: 4, padding: '4px 8px' }}>
-                    {LANG_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.code}
-                        className={`btn btn-sm ${lang === opt.code ? 'btn-primary' : 'btn-ghost'}`}
-                        onClick={() => setLang(opt.code as Lang)}
-                        style={{ flex: 1 }}
-                        title={opt.label}
-                      >
-                        {opt.flag} {opt.code.toUpperCase()}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="h-divider" />
                   <button className="btn btn-ghost" style={{ width: '100%', textAlign: 'left', color: 'var(--danger)' }} onClick={logout}>{t('menu.logout')}</button>
                 </div>
               )}
@@ -204,6 +190,47 @@ export function Shell({ title, children, showBack }: { title: string; children: 
         </header>
         <main className="content" key={loc.pathname}>{children}</main>
       </div>
+    </div>
+  );
+}
+
+function LangPicker({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void }) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      if (wrap.current && !wrap.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+
+  const current = LANG_OPTIONS.find((o) => o.code === lang) || LANG_OPTIONS[0];
+  return (
+    <div className="lang-picker" ref={wrap}>
+      <button className="lang-trigger" onClick={() => setOpen((v) => !v)} aria-label="Language">
+        <span className="lang-flag">{current.flag}</span>
+        <span className="lang-code">{current.code.toUpperCase()}</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9" /></svg>
+      </button>
+      {open && (
+        <div className="card lang-menu">
+          {LANG_OPTIONS.map((opt) => (
+            <button
+              key={opt.code}
+              className={`lang-option ${lang === opt.code ? 'active' : ''}`}
+              onClick={() => { setLang(opt.code as Lang); setOpen(false); }}
+            >
+              <span className="lang-flag">{opt.flag}</span>
+              <span>{opt.label}</span>
+              {lang === opt.code && (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

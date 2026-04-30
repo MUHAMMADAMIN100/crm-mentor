@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../store';
+import { useT } from '../../i18n';
 
 export function LoginPage() {
+  const { t } = useT();
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [err, setErr] = useState('');
@@ -21,29 +23,29 @@ export function LoginPage() {
       else if (u.role === 'TEACHER') nav('/teacher');
       else nav('/student');
     } catch (e: any) {
-      setErr(e?.response?.data?.message || 'Ошибка входа');
+      setErr(e?.response?.data?.message || t('auth.errLogin'));
     } finally { setBusy(false); }
   }
 
   return (
     <div className="auth-shell">
       <form className="auth-card" onSubmit={submit}>
-        <h1>Miz</h1>
-        <p>Войдите в свой аккаунт</p>
+        <h1>{t('auth.miz')}</h1>
+        <p>{t('auth.login.title')}</p>
         <div className="field">
-          <label>Логин</label>
+          <label>{t('auth.login.label')}</label>
           <input className="input" value={login} onChange={(e) => setLogin(e.target.value)} required autoFocus />
         </div>
         <div className="field">
-          <label>Пароль</label>
+          <label>{t('auth.password')}</label>
           <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         </div>
         {err && <div style={{ color: 'var(--danger)', fontSize: 13, marginBottom: 12 }}>{err}</div>}
         <button className="btn btn-primary" style={{ width: '100%' }} disabled={busy}>
-          {busy ? 'Входим…' : 'Войти'}
+          {busy ? t('auth.login.busy') : t('auth.login.btn')}
         </button>
         <div style={{ marginTop: 16, fontSize: 12, color: 'var(--text-muted)' }}>
-          Демо: admin/admin123, teacher/teacher123, student/student123
+          {t('auth.login.demo')}
         </div>
       </form>
     </div>

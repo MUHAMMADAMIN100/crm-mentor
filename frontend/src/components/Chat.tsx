@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { api } from '../api';
 import { useAuth, toast } from '../store';
 import { io, Socket } from 'socket.io-client';
+import { useT } from '../i18n';
 
 let socket: Socket | null = null;
 let socketUserId: string | null = null;
@@ -38,6 +39,7 @@ interface Props {
 }
 
 export function ChatPanel({ autoOpenWithUserId }: Props = {}) {
+  const { t } = useT();
   const { user } = useAuth();
   const [chats, setChats] = useState<any[]>([]);
   const [active, setActive] = useState<string | null>(null);
@@ -47,7 +49,8 @@ export function ChatPanel({ autoOpenWithUserId }: Props = {}) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const loadChats = useCallback(() => {
-    return api.get('/chat').then((r) => setChats(r.data)).catch(() => toast.error('Не удалось загрузить чаты'));
+    return api.get('/chat').then((r) => setChats(r.data)).catch(() => toast.error(t('chat.notLoadedChats')));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => { loadChats(); }, [loadChats]);
@@ -61,7 +64,7 @@ export function ChatPanel({ autoOpenWithUserId }: Props = {}) {
         await loadChats();
         setActive(r.data.id);
       })
-      .catch(() => toast.error('Не удалось открыть чат'))
+      .catch(() => toast.error(t('chat.notOpened')))
       .finally(() => setOpening(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOpenWithUserId, user]);
@@ -93,7 +96,7 @@ export function ChatPanel({ autoOpenWithUserId }: Props = {}) {
   // Load messages + join room when active changes
   useEffect(() => {
     if (!active || !user) return;
-    api.get(`/chat/${active}/messages`).then((r) => setMessages(r.data)).catch(() => toast.error('Не удалось загрузить сообщения'));
+    api.get(`/chat/${active}/messages`).then((r) => setMessages(r.data)).catch(() => toast.error(t('chat.notLoadedMessages')));
     const s = getSocket(user.id);
     s.emit('chat:join', active);
   }, [active, user]);
@@ -133,7 +136,7 @@ export function ChatPanel({ autoOpenWithUserId }: Props = {}) {
       const r = await api.get('/chat/support');
       await loadChats();
       setActive(r.data.id);
-    } catch { toast.error('Не удалось открыть чат поддержки'); }
+    } catch { toast.error(t('chat.notOpenedSupport')); }
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -144,29 +147,29 @@ export function ChatPanel({ autoOpenWithUserId }: Props = {}) {
     <div className={`chat-shell ${active ? 'has-active' : 'no-active'}`}>
       <div className="chat-list">
         <div style={{ padding: 12, borderBottom: '1px solid var(--border)' }}>
-          <button className="btn btn-sm" style={{ width: '100%' }} onClick={openSupport}>💬 Чат Miz Support</button>
+          <button className="btn btn-sm" style={{ width: '100%' }} onClick={openSupport}>{t('btn.support')}</button>
         </div>
         {chats.map((c) => {
           const other = c.members.find((m: any) => m.userId !== user?.id);
-          const title = c.title || other?.user?.fullName || 'Чат';
+          const title = c.title || other?.user?.fullName || t('chat.title');
           const last = c.messages[0];
           return (
             <div key={c.id} className={`chat-list-item ${active === c.id ? 'active' : ''}`} onClick={() => setActive(c.id)}>
               <div style={{ fontWeight: 500 }}>{title}</div>
               <div className="muted" style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {last?.text || (last ? '[вложение]' : 'нет сообщений')}
+                {last?.text || (last ? t('chat.attachment') : t('chat.noMessages'))}
               </div>
             </div>
           );
         })}
-        {chats.length === 0 && <div className="empty">Нет чатов</div>}
+        {chats.length === 0 && <div className="empty">{t('empty.noChats')}</div>}
       </div>
 
       <div className="chat-pane">
         {active ? (
           <>
             <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, background: '#fff' }}>
-              <button className="chat-back" onClick={() => setActive(null)} aria-label="К списку чатов">
+              <button className="chat-back" onClick={() => setActive(null)} aria-label={t('btn.back')}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
               </button>
               <div style={{ fontWeight: 600 }}>
@@ -174,7 +177,7 @@ export function ChatPanel({ autoOpenWithUserId }: Props = {}) {
                   const c = chats.find((x) => x.id === active);
                   if (!c) return '';
                   const other = c.members.find((m: any) => m.userId !== user?.id);
-                  return c.title || other?.user?.fullName || 'Чат';
+                  return c.title || other?.user?.fullName || t('chat.title');
                 })()}
               </div>
             </div>
@@ -184,12 +187,12 @@ export function ChatPanel({ autoOpenWithUserId }: Props = {}) {
                   {m.senderId !== user?.id && <div style={{ fontSize: 11, fontWeight: 500, opacity: 0.7 }}>{m.sender?.fullName}</div>}
                   <div>{m.text}</div>
                   <div className="chat-msg-meta">
-                    {new Date(m.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
-                    {m.__optimistic && ' · отправляется…'}
+                    {new Date(m.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                    {m.__optimistic && ` · ${t('chat.sending')}`}
                   </div>
                 </div>
               ))}
-              {messages.length === 0 && <div className="empty">Сообщений нет</div>}
+              {messages.length === 0 && <div className="empty">{t('empty.noMessages')}</div>}
             </div>
             <div className="chat-input">
               <textarea
@@ -199,13 +202,13 @@ export function ChatPanel({ autoOpenWithUserId }: Props = {}) {
                 rows={1}
               />
               <button className="btn btn-primary" onClick={send} disabled={!text.trim()}>
-                Отправить
+                {t('btn.send')}
               </button>
             </div>
           </>
         ) : (
           <div className="empty" style={{ margin: 'auto' }}>
-            {opening ? 'Открываем чат…' : 'Выберите чат'}
+            {opening ? t('status.opening') : t('empty.selectChat')}
           </div>
         )}
       </div>

@@ -2,15 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Shell } from '../../components/Shell';
 import { api } from '../../api';
 import { useAuth, useAi, toast, confirmDialog } from '../../store';
+import { useT } from '../../i18n';
 import '../../styles/ai.css';
 
-const ROLE_LABEL: Record<string, string> = {
-  ADMIN: 'Доступ администратора',
-  TEACHER: 'Доступ учителя',
-  STUDENT: 'Доступ ученика',
-};
-
 export function AIAssistantPage() {
+  const { t } = useT();
   const { user } = useAuth();
   const { messages, model, setMessages, setModel, clear } = useAi();
   const [input, setInput] = useState('');
@@ -37,9 +33,9 @@ export function AIAssistantPage() {
       setMessages([...next, { role: 'assistant' as const, content: r.data.answer }]);
       if (r.data.model && r.data.model !== 'fallback') setModel(prettyModel(r.data.model));
     } catch (e: any) {
-      const detail = e?.response?.data?.message || e?.message || 'неизвестная ошибка';
+      const detail = e?.response?.data?.message || e?.message || t('ai.unknownErr');
       const status = e?.response?.status ? ` (HTTP ${e.response.status})` : '';
-      setMessages([...next, { role: 'assistant' as const, content: `Не удалось получить ответ${status}: ${detail}` }]);
+      setMessages([...next, { role: 'assistant' as const, content: `${t('ai.errAnswer')}${status}: ${detail}` }]);
     } finally {
       setLoading(false);
     }
@@ -54,23 +50,26 @@ export function AIAssistantPage() {
 
   async function clearChat() {
     if (messages.length === 0) return;
-    const ok = await confirmDialog({ title: 'Очистить диалог?', body: 'История сообщений будет удалена.', danger: true, okLabel: 'Очистить' });
-    if (ok) { clear(); toast.success('История очищена'); }
+    const ok = await confirmDialog({ title: t('ai.clearTitle'), body: t('ai.clearBody'), danger: true, okLabel: t('btn.clear') });
+    if (ok) { clear(); toast.success(t('ai.cleared')); }
   }
 
+  const roleKey: any = `ai.role.${user?.role || 'STUDENT'}`;
+  const aboutKey: any = user?.role === 'ADMIN' ? 'ai.aboutAdmin' : user?.role === 'TEACHER' ? 'ai.aboutTeacher' : 'ai.aboutStudent';
+
   return (
-    <Shell title="ИИ-помощник">
+    <Shell title={t('ai.title')}>
       <div className="ai-shell">
         <div className="ai-header">
           <div className="ai-avatar">
             <BotIcon />
           </div>
           <div>
-            <div className="ai-title">ИИ-помощник</div>
-            <div className="ai-subtitle">Анализирует данные CRM в реальном времени · {ROLE_LABEL[user?.role || 'STUDENT']}</div>
+            <div className="ai-title">{t('ai.title')}</div>
+            <div className="ai-subtitle">{t('ai.subtitle')}{t(roleKey)}</div>
           </div>
           {messages.length > 0 && (
-            <button className="btn btn-sm btn-ghost" style={{ marginLeft: 'auto' }} onClick={clearChat} title="Очистить диалог">Очистить</button>
+            <button className="btn btn-sm btn-ghost" style={{ marginLeft: 'auto' }} onClick={clearChat} title={t('ai.clearTitle')}>{t('ai.clearChat')}</button>
           )}
           <div className="ai-model-pill"><span className="dot" /> {model || 'AI'}</div>
         </div>
@@ -79,12 +78,10 @@ export function AIAssistantPage() {
           {messages.length === 0 && (
             <div className="ai-empty">
               <div className="big-bot"><BotIcon /></div>
-              <h2>Задайте вопрос</h2>
+              <h2>{t('ai.askPrompt')}</h2>
               <p>
-                Я анализирую базу данных Miz и отвечаю на ваши вопросы о
-                {user?.role === 'ADMIN' && ' учителях, учениках, курсах, финансах и эффективности платформы.'}
-                {user?.role === 'TEACHER' && ' ваших учениках, курсах, расписании, домашках и финансах.'}
-                {user?.role === 'STUDENT' && ' ваших курсах, прогрессе, расписании и балансе.'}
+                {t('ai.askLeading')}
+                {t(aboutKey)}
               </p>
               <div className="ai-suggestions">
                 {suggestions.map((s) => (
@@ -116,18 +113,18 @@ export function AIAssistantPage() {
         <div className="ai-input-bar">
           <textarea
             className="ai-input"
-            placeholder="Задайте вопрос о ваших данных…"
+            placeholder={t('ai.placeholder')}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onKeyDown}
             rows={1}
           />
-          <button className="ai-send" disabled={!input.trim() || loading} onClick={() => send(input)} title="Отправить">
+          <button className="ai-send" disabled={!input.trim() || loading} onClick={() => send(input)} title={t('btn.send')}>
             <SendIcon />
           </button>
         </div>
         <div className="ai-disclaimer">
-          ИИ анализирует актуальные данные из вашей роли. История сохраняется на устройстве до выхода.
+          {t('ai.disclaimer')}
         </div>
       </div>
     </Shell>

@@ -5,8 +5,10 @@ import { useAuth, toast } from '../../store';
 import { useApi } from '../../hooks';
 import { Loading } from '../../components/Loading';
 import { Modal } from '../../components/Modal';
+import { useT } from '../../i18n';
 
 export function TeacherFinance() {
+  const { t } = useT();
   const { data, refetch: load } = useApi<any>('/finance/teacher');
   const { user, refreshMe } = useAuth();
   const [currency, setCurrency] = useState((user as any)?.teacherCurrency || 'RUB');
@@ -19,13 +21,12 @@ export function TeacherFinance() {
 
   async function saveCurrency() {
     try {
-      // Optimistic: bump cached currency immediately
       await api.patch('/teacher/currency', { currency });
       invalidateApi('/finance/teacher');
       await refreshMe();
-      toast.success('Валюта обновлена');
+      toast.success(t('finance.currencyUpdated'));
       load();
-    } catch { toast.error('Не удалось обновить валюту'); }
+    } catch { toast.error(t('finance.currencyErr')); }
   }
 
   const periodMs = useMemo(() => {
@@ -69,10 +70,10 @@ export function TeacherFinance() {
     return data.students.filter((s: any) => !q || s.fullName.toLowerCase().includes(q));
   }, [data, search]);
 
-  const periodLabel = period === '7d' ? 'Последние 7 дней'
-    : period === '30d' ? 'Последние 30 дней'
-    : period === '90d' ? 'Последние 90 дней'
-    : 'За всё время';
+  const periodLabel = period === '7d' ? t('finance.period.7d')
+    : period === '30d' ? t('finance.period.30d')
+    : period === '90d' ? t('finance.period.90d')
+    : t('finance.period.all');
 
   async function exportPdf() {
     if (!data || !reportRef.current) return;
@@ -119,7 +120,7 @@ export function TeacherFinance() {
       setPdfPreview({ url, filename });
     } catch (e: any) {
       console.error('[exportPdf]', e);
-      toast.error('Не удалось сформировать PDF');
+      toast.error(t('pdf.notGenerated'));
     } finally {
       setGenerating(false);
     }
@@ -130,103 +131,93 @@ export function TeacherFinance() {
     setPdfPreview(null);
   }
 
-  if (!data) return <Shell title="Финансы"><Loading label="Загружаем финансы…" /></Shell>;
-  // Note: data may be slightly stale on first paint while cache revalidates;
-  // user sees content instantly instead of a skeleton.
+  if (!data) return <Shell title={t('finance.title')}><Loading label={t('loader.finance')} /></Shell>;
 
   const cur = data.currency || 'RUB';
 
   return (
-    <Shell title="Финансы">
-      {/* Currency picker */}
+    <Shell title={t('finance.title')}>
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="flex" style={{ flexWrap: 'wrap' }}>
-          <strong style={{ marginRight: 8 }}>Валюта:</strong>
+          <strong style={{ marginRight: 8 }}>{t('finance.currency')}:</strong>
           <select className="select" style={{ maxWidth: 200 }} value={currency} onChange={(e) => setCurrency(e.target.value)}>
-            <option value="RUB">₽ Рубль</option>
-            <option value="USD">$ Доллар</option>
-            <option value="EUR">€ Евро</option>
-            <option value="KZT">₸ Тенге</option>
-            <option value="UZS">сум Сум</option>
+            <option value="RUB">{t('finance.rub')}</option>
+            <option value="USD">{t('finance.usd')}</option>
+            <option value="EUR">{t('finance.eur')}</option>
+            <option value="KZT">{t('finance.kzt')}</option>
+            <option value="UZS">{t('finance.uzs')}</option>
           </select>
-          {currency !== cur && <button className="btn btn-primary" onClick={saveCurrency}>Сохранить</button>}
+          {currency !== cur && <button className="btn btn-primary" onClick={saveCurrency}>{t('btn.save')}</button>}
           <div className="spacer" />
-          <span className="muted" style={{ fontSize: 12 }}>Применяется ко всем ученикам</span>
+          <span className="muted" style={{ fontSize: 12 }}>{t('finance.applyToAll')}</span>
         </div>
       </div>
 
-      {/* Period & toolbar */}
       <div className="fin-toolbar">
-        <strong>Период:</strong>
+        <strong>{t('finance.period')}:</strong>
         {(['7d', '30d', '90d', 'all'] as const).map((p) => (
           <button key={p} className={`btn btn-sm ${period === p ? 'btn-primary' : ''}`} onClick={() => setPeriod(p)}>
-            {p === '7d' ? '7 дней' : p === '30d' ? '30 дней' : p === '90d' ? '90 дней' : 'Всё время'}
+            {t(`finance.period.${p}` as any)}
           </button>
         ))}
         <div className="spacer" />
         <button className="btn" onClick={exportPdf} disabled={generating}>
-          {generating ? 'Готовим PDF…' : '📄 Экспорт PDF'}
+          {generating ? t('status.preparing') : `📄 ${t('btn.exportPdf')}`}
         </button>
       </div>
 
-      {/* Stats */}
       <div className="fin-stats">
         <div className="fin-stat in">
-          <div className="label"><span className="label-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></svg></span>Поступления за период</div>
-          <div className="value">{periodTotals.income.toLocaleString('ru-RU')} <span style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-soft)' }}>{cur}</span></div>
-          <div className="sub">{filteredPayments.filter((p: any) => p.kind === 'TOPUP').length} операций</div>
+          <div className="label"><span className="label-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></svg></span>{t('finance.income')}</div>
+          <div className="value">{periodTotals.income.toLocaleString()} <span style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-soft)' }}>{cur}</span></div>
+          <div className="sub">{filteredPayments.filter((p: any) => p.kind === 'TOPUP').length} {t('finance.operations')}</div>
         </div>
         <div className="fin-stat out">
-          <div className="label"><span className="label-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6" /><polyline points="17 18 23 18 23 12" /></svg></span>Списания за период</div>
-          <div className="value">{periodTotals.charged.toLocaleString('ru-RU')} <span style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-soft)' }}>{cur}</span></div>
-          <div className="sub">{filteredPayments.filter((p: any) => p.kind === 'CHARGE').length} списаний</div>
+          <div className="label"><span className="label-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6" /><polyline points="17 18 23 18 23 12" /></svg></span>{t('finance.outcome')}</div>
+          <div className="value">{periodTotals.charged.toLocaleString()} <span style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-soft)' }}>{cur}</span></div>
+          <div className="sub">{filteredPayments.filter((p: any) => p.kind === 'CHARGE').length} {t('finance.charges')}</div>
         </div>
         <div className="fin-stat bal">
-          <div className="label"><span className="label-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg></span>Чистая динамика</div>
+          <div className="label"><span className="label-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg></span>{t('finance.net')}</div>
           <div className="value" style={{ color: periodTotals.net < 0 ? 'var(--danger)' : 'var(--primary)' }}>
-            {periodTotals.net >= 0 ? '+' : ''}{periodTotals.net.toLocaleString('ru-RU')} <span style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-soft)' }}>{cur}</span>
+            {periodTotals.net >= 0 ? '+' : ''}{periodTotals.net.toLocaleString()} <span style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-soft)' }}>{cur}</span>
           </div>
-          <div className="sub">за выбранный период</div>
+          <div className="sub">{t('finance.netSub')}</div>
         </div>
         <div className="fin-stat debt">
-          <div className="label"><span className="label-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /></svg></span>Текущие долги</div>
-          <div className="value">{(data.totals.totalDebt || 0).toLocaleString('ru-RU')} <span style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-soft)' }}>{cur}</span></div>
-          <div className="sub">{data.students.filter((s: any) => s.balance < 0).length} ученик(ов) в минусе</div>
+          <div className="label"><span className="label-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /></svg></span>{t('finance.debt')}</div>
+          <div className="value">{(data.totals.totalDebt || 0).toLocaleString()} <span style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-soft)' }}>{cur}</span></div>
+          <div className="sub">{data.students.filter((s: any) => s.balance < 0).length} {t('finance.debtSub')}</div>
         </div>
       </div>
 
-      {/* Mini chart */}
       <div className="card" style={{ marginBottom: 16 }}>
-        <h3>Поступления по дням</h3>
+        <h3>{t('finance.byDays')}</h3>
         {incomeByDay.entries.length === 0 ? (
-          <div className="empty">За период поступлений не было</div>
+          <div className="empty">{t('empty.noPayments')}</div>
         ) : (
           <div className="fin-bars">
             {incomeByDay.entries.map(([d, v]) => (
-              <div
-                key={d}
-                className="bar"
+              <div key={d} className="bar"
                 style={{ height: `${Math.max(3, (v / incomeByDay.max) * 100)}%` }}
-                title={`${d}: ${v.toLocaleString('ru-RU')} ${cur}`}
-              />
+                title={`${d}: ${v.toLocaleString()} ${cur}`} />
             ))}
           </div>
         )}
       </div>
 
-      {/* Students table */}
       <div className="card" style={{ padding: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
-          <h3 style={{ margin: 0 }}>Ученики</h3>
+          <h3 style={{ margin: 0 }}>{t('nav.students')}</h3>
           <div className="spacer" />
-          <input className="input" placeholder="🔍 Поиск по имени" style={{ maxWidth: 280 }} value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input className="input" placeholder={t('finance.search')} style={{ maxWidth: 280 }} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <table className="table">
           <thead>
             <tr>
-              <th>Ученик</th>
-              <th>Стоимость занятия</th>
-              <th>Баланс</th>
+              <th>{t('students.title')}</th>
+              <th>{t('finance.individualPrice')}</th>
+              <th>{t('students.balance')}</th>
               <th></th>
             </tr>
           </thead>
@@ -237,23 +228,20 @@ export function TeacherFinance() {
                 <td>{s.individualPrice ?? '—'}</td>
                 <td>
                   <span style={{
-                    padding: '3px 10px',
-                    borderRadius: 999,
-                    fontSize: 13,
-                    fontWeight: 500,
+                    padding: '3px 10px', borderRadius: 999, fontSize: 13, fontWeight: 500,
                     background: s.balance < 0 ? '#fee2e2' : s.balance === 0 ? 'var(--surface-2)' : '#dcfce7',
                     color: s.balance < 0 ? 'var(--danger)' : s.balance === 0 ? 'var(--text-muted)' : 'var(--success)',
                   }}>
-                    {s.balance.toLocaleString('ru-RU')} {cur}
+                    {s.balance.toLocaleString()} {cur}
                   </span>
                 </td>
                 <td style={{ textAlign: 'right' }}>
-                  <button className="btn btn-sm btn-primary" onClick={() => setTopupTarget(s)}>+ Пополнить</button>
+                  <button className="btn btn-sm btn-primary" onClick={() => setTopupTarget(s)}>{t('btn.topup')}</button>
                 </td>
               </tr>
             ))}
             {filteredStudents.length === 0 && (
-              <tr><td colSpan={4} className="empty">Ничего не найдено</td></tr>
+              <tr><td colSpan={4} className="empty">{t('empty.noFound')}</td></tr>
             )}
           </tbody>
         </table>
@@ -461,31 +449,21 @@ function SummaryBox({ label, value, cur, color, prefix = '' }: any) {
 }
 
 function PdfPreviewModal({ preview, onClose }: { preview: { url: string; filename: string }; onClose: () => void }) {
+  const { t } = useT();
   return (
     <div className="modal-overlay" role="presentation" onClick={onClose}>
-      <div
-        className="modal pdf-preview-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="pdf-preview-title"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="modal pdf-preview-modal" role="dialog" aria-modal="true" aria-labelledby="pdf-preview-title" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header" style={{ marginBottom: 12 }}>
-          <h3 id="pdf-preview-title">Предпросмотр PDF</h3>
-          <button className="modal-close" onClick={onClose} aria-label="Закрыть">×</button>
+          <h3 id="pdf-preview-title">{t('pdf.preview')}</h3>
+          <button className="modal-close" onClick={onClose} aria-label={t('btn.close')}>×</button>
         </div>
         <div className="pdf-preview-body">
-          <iframe
-            src={preview.url}
-            title="PDF preview"
-            style={{ width: '100%', height: '100%', border: 'none', borderRadius: 8, background: '#525659' }}
-          />
+          <iframe src={preview.url} title="PDF preview"
+            style={{ width: '100%', height: '100%', border: 'none', borderRadius: 8, background: '#525659' }} />
         </div>
         <div className="modal-actions" style={{ marginTop: 12 }}>
-          <button className="btn" onClick={onClose}>Закрыть</button>
-          <a className="btn btn-primary" href={preview.url} download={preview.filename}>
-            ⬇ Скачать PDF
-          </a>
+          <button className="btn" onClick={onClose}>{t('btn.close')}</button>
+          <a className="btn btn-primary" href={preview.url} download={preview.filename}>{t('pdf.dlBtn')}</a>
         </div>
       </div>
     </div>
@@ -493,14 +471,14 @@ function PdfPreviewModal({ preview, onClose }: { preview: { url: string; filenam
 }
 
 function TopupModal({ student, cur, onClose }: any) {
+  const { t } = useT();
   const [amount, setAmount] = useState<number>(0);
   const [comment, setComment] = useState('');
   const [saving, setSaving] = useState(false);
 
   async function save() {
-    if (!amount || amount <= 0) { toast.warning('Сумма должна быть положительной'); return; }
+    if (!amount || amount <= 0) { toast.warning(t('finance.topup.errPositive')); return; }
     setSaving(true);
-    // Optimistic: bump balance in cache instantly so UI feels instant
     mutateCache<any>('/finance/teacher', undefined, (prev) => {
       if (!prev) return prev as any;
       return {
@@ -513,26 +491,25 @@ function TopupModal({ student, cur, onClose }: any) {
     try {
       await api.post(`/finance/teacher/students/${student.id}/topup`, { amount, comment });
       invalidateApi('/finance/teacher');
-      toast.success(`Баланс пополнен: +${amount} ${cur}`);
+      toast.success(`${t('finance.topup.success')} +${amount} ${cur}`);
       onClose(true);
     } catch (e: any) {
-      // Rollback
       invalidateApi('/finance/teacher');
-      toast.error(e?.response?.data?.message || 'Ошибка пополнения');
+      toast.error(e?.response?.data?.message || t('finance.topup.err'));
     } finally { setSaving(false); }
   }
 
   return (
-    <Modal open onClose={() => onClose(false)} title={`Пополнить — ${student.fullName}`}
-      footer={<><button className="btn" onClick={() => onClose(false)}>Отмена</button><button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? 'Сохраняем…' : 'Пополнить'}</button></>}>
-      <p className="muted" style={{ marginTop: 0 }}>Текущий баланс: <strong style={{ color: student.balance < 0 ? 'var(--danger)' : 'var(--text)' }}>{student.balance} {cur}</strong></p>
+    <Modal open onClose={() => onClose(false)} title={`${t('finance.topup.title')} ${student.fullName}`}
+      footer={<><button className="btn" onClick={() => onClose(false)}>{t('btn.cancel')}</button><button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? t('status.saving') : t('btn.topup')}</button></>}>
+      <p className="muted" style={{ marginTop: 0 }}>{t('finance.topup.current')} <strong style={{ color: student.balance < 0 ? 'var(--danger)' : 'var(--text)' }}>{student.balance} {cur}</strong></p>
       <div className="field">
-        <label>Сумма пополнения, {cur}</label>
+        <label>{t('finance.topup.amount')} {cur}</label>
         <input className="input" type="number" min={1} value={amount || ''} onChange={(e) => setAmount(+e.target.value)} autoFocus />
       </div>
       <div className="field">
-        <label>Комментарий (необязательно)</label>
-        <input className="input" value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Например: оплата за май" />
+        <label>{t('finance.topup.comment')}</label>
+        <input className="input" value={comment} onChange={(e) => setComment(e.target.value)} placeholder={t('finance.topup.hint')} />
       </div>
     </Modal>
   );

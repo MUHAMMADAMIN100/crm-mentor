@@ -1,3 +1,5 @@
+import { t } from '../i18n';
+
 interface Props {
   full?: boolean;
   label?: string;
@@ -8,7 +10,8 @@ interface Props {
  * Branded Miz loader: 3 orbiting petals around a pulsing gradient core,
  * with soft halo glow underneath. CSS-only.
  */
-export function Loading({ full, label = 'Загрузка…', size = 84 }: Props) {
+export function Loading({ full, label, size = 84 }: Props) {
+  const lbl = label ?? t('loader.default');
   const inner = (
     <div className="miz-loader" style={{ ['--size' as any]: `${size}px` }}>
       <div className="miz-loader-halo" />
@@ -24,7 +27,7 @@ export function Loading({ full, label = 'Загрузка…', size = 84 }: Prop
       <div className="miz-loader-core">
         <span className="miz-loader-core-inner" />
       </div>
-      {label && <div className="miz-loader-label">{label}</div>}
+      {lbl && <div className="miz-loader-label">{lbl}</div>}
     </div>
   );
   if (full) return <div className="miz-loader-full">{inner}</div>;
