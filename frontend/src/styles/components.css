@@ -593,6 +593,13 @@ main.content { max-width: 100%; overflow-x: hidden; }
      desktop/laptop rules — sidebar is fixed and should not reserve
      a grid track on tablet/mobile. */
   .app-shell { grid-template-columns: 1fr !important; }
+  /* Grid items default to min-width: auto (= min-content), which lets a wide
+     descendant (long string, table, input with width:100% + max-width) push
+     the grid track beyond the viewport. Forcing min-width: 0 on every level
+     of the layout chain locks the layout to viewport width. */
+  .app-shell > * { min-width: 0 !important; max-width: 100% !important; }
+  main.content { min-width: 0; }
+  main.content > * { min-width: 0; max-width: 100%; }
   .cards-grid { grid-template-columns: 1fr !important; gap: 12px; }
   .cards-grid > * {
     min-width: 0;
@@ -606,12 +613,21 @@ main.content { max-width: 100%; overflow-x: hidden; }
      is wider than the card, the card scrolls horizontally so the user
      can reach the last column instead of it being clipped off-screen. */
   .card { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .card > * { min-width: 0; }
+  .card, .card > * { min-width: 0; }
   .card .table {
     display: table;
     width: 100%;
     min-width: max-content;
     white-space: nowrap;
+  }
+  /* Inputs with width:100% inside flex containers were ignoring shrink
+     because their auto flex-basis came from the width declaration. Force
+     them to shrink. */
+  .input, .select, .textarea { min-width: 0; }
+  /* Inline flex headers (e.g. "Ученики + поиск") — wrap properly */
+  .card > div[style*="flex"], .card > div[style*="display: flex"] {
+    flex-wrap: wrap;
+    min-width: 0;
   }
 
   /* Stat / toolbar items must never push beyond their grid track */
