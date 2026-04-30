@@ -1,31 +1,34 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Shell } from '../../components/Shell';
-import { api } from '../../api';
+import { api, invalidateApi, mutateCache } from '../../api';
+import { useApi } from '../../hooks';
 import { Modal } from '../../components/Modal';
 import { SkeletonGrid } from '../../components/Skeleton';
 import { toast } from '../../store';
 
 export function TeacherCourses() {
-  const [list, setList] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: list, loading, refetch } = useApi<any[]>('/courses');
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ title: '', description: '', category: '', price: 0 });
   const [saving, setSaving] = useState(false);
-
-  function load() { setLoading(true); api.get('/courses').then((r) => setList(r.data)).finally(() => setLoading(false)); }
-  useEffect(load, []);
 
   async function create() {
     if (!form.title.trim()) { toast.warning('Введите название'); return; }
     setSaving(true);
     try {
-      await api.post('/courses', form);
+      const r = await api.post('/courses', form);
+      mutateCache<any[]>('/courses', undefined, (prev) => {
+        const item = { ...r.data, _count: { modules: 0, accesses: 0 } };
+        return prev ? [item, ...prev] : [item];
+      });
+      invalidateApi('/courses');
+      refetch();
       setOpen(false); setForm({ title: '', description: '', category: '', price: 0 });
       toast.success('Курс создан');
-      load();
-    } catch (e: any) { toast.error(e?.response?.data?.message || 'Не удалось создать'); }
-    finally { setSaving(false); }
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'Не удалось создать');
+    } finally { setSaving(false); }
   }
   return (
     <Shell title="Курсы">
@@ -33,9 +36,9 @@ export function TeacherCourses() {
         <div className="spacer" />
         <button className="btn btn-primary" onClick={() => setOpen(true)}>+ Создать курс</button>
       </div>
-      {loading && list.length === 0 ? <SkeletonGrid count={3} /> : (
+      {loading && !list ? <SkeletonGrid count={3} /> : (
         <div className="cards-grid">
-          {list.map((c) => (
+          {(list || []).map((c) => (
             <Link key={c.id} to={`/teacher/courses/${c.id}`} className="card" style={{ display: 'block' }}>
               <h3>{c.title}</h3>
               <div className="muted" style={{ fontSize: 13 }}>{c.category}</div>
@@ -46,7 +49,7 @@ export function TeacherCourses() {
               </div>
             </Link>
           ))}
-          {list.length === 0 && <div className="empty">Нет курсов</div>}
+          {(!list || list.length === 0) && <div className="empty">Нет курсов</div>}
         </div>
       )}
 

@@ -95,6 +95,8 @@ model StudentProfile {
   courseAccesses  CourseAccess[]
   payments        Payment[]
   createdAt       DateTime @default(now())
+
+  @@index([teacherId])
 }
 
 // =====================
@@ -135,6 +137,8 @@ model Course {
   groups      Group[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([teacherId])
 }
 
 model Module {
@@ -145,6 +149,8 @@ model Module {
   position  Int      @default(0)
   lessons   CourseLesson[]
   createdAt DateTime @default(now())
+
+  @@index([courseId])
 }
 
 // CourseLesson — урок курса (lesson в смысле "юнит контента"); календарный урок = Lesson
@@ -161,6 +167,8 @@ model CourseLesson {
   blocks      ContentBlock[]
   homeworks   HomeworkSubmission[]
   createdAt   DateTime @default(now())
+
+  @@index([moduleId])
 }
 
 enum BlockType {
@@ -210,6 +218,8 @@ model ContentBlock {
 
   progress     BlockProgress[]
   quizSubs     QuizSubmission[]
+
+  @@index([courseLessonId])
 }
 
 model CourseAccess {
@@ -238,6 +248,8 @@ model Group {
   lessons    Lesson[]
   chat       Chat?
   createdAt  DateTime @default(now())
+
+  @@index([teacherId])
 }
 
 model GroupMember {
@@ -283,6 +295,10 @@ model Lesson {
   charged     Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([teacherId, startAt])
+  @@index([studentProfileId, startAt])
+  @@index([groupId])
 }
 
 model FreeSlot {
@@ -296,6 +312,8 @@ model FreeSlot {
   takenName  String?
   takenContact String?
   createdAt  DateTime @default(now())
+
+  @@index([teacherId, startAt])
 }
 
 model PersonalEvent {
@@ -307,6 +325,8 @@ model PersonalEvent {
   reminder  Boolean  @default(false)
   description String?
   createdAt DateTime @default(now())
+
+  @@index([userId, startAt])
 }
 
 // =====================
@@ -327,6 +347,8 @@ model Payment {
   comment   String?
   lessonId  String?
   createdAt DateTime @default(now())
+
+  @@index([studentId, createdAt])
 }
 
 // =====================
@@ -350,6 +372,7 @@ model HomeworkSubmission {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   @@unique([courseLessonId, studentId])
+  @@index([studentId, status])
 }
 
 model BlockProgress {
@@ -362,6 +385,7 @@ model BlockProgress {
   doneAt    DateTime?
   data      Json?    // например ответ на текстовое задание
   @@unique([blockId, studentId])
+  @@index([studentId])
 }
 
 model QuizSubmission {
@@ -437,6 +461,8 @@ model Message {
   text      String?
   fileUrl   String?
   createdAt DateTime @default(now())
+
+  @@index([chatId, createdAt])
 }
 
 // =====================
@@ -461,6 +487,8 @@ model Notification {
   body      String?
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 model Note {

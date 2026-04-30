@@ -1,21 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Shell } from '../../components/Shell';
-import { api } from '../../api';
+import { useApi } from '../../hooks';
 import { TreeView } from '../../components/Tree';
 import { SkeletonGrid } from '../../components/Skeleton';
 import { NotesCard } from '../../components/NotesCard';
 
 export function StudentHome() {
-  const [data, setData] = useState<any>(null);
-  const [progress, setProgress] = useState<any>(null);
+  const { data, loading: loadingDash } = useApi<any>('/students/me/dashboard');
+  const { data: progress } = useApi<any>('/progress/me');
   const [showProgress, setShowProgress] = useState(false);
 
-  useEffect(() => {
-    api.get('/students/me/dashboard').then((r) => setData(r.data));
-    api.get('/progress/me').then((r) => setProgress(r.data));
-  }, []);
-
-  if (!data && !progress) {
+  if (!data && !progress && loadingDash) {
     return (
       <Shell title="Главное">
         <SkeletonGrid count={4} />
@@ -48,7 +43,7 @@ export function StudentHome() {
                 </div>
               )}
             </>
-          ) : 'Загрузка…'}
+          ) : '—'}
         </div>
 
         <div className="card">

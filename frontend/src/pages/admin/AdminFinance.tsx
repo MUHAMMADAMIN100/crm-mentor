@@ -1,14 +1,12 @@
-import { useEffect, useState } from 'react';
 import { Shell } from '../../components/Shell';
-import { api } from '../../api';
+import { useApi } from '../../hooks';
 import { Loading } from '../../components/Loading';
 
 export function AdminFinance() {
-  const [data, setData] = useState<any>(null);
-  useEffect(() => { api.get('/admin/finance').then((r) => setData(r.data)); }, []);
+  const { data, loading } = useApi<any>('/admin/finance');
   return (
     <Shell title="Финансы">
-      {!data ? <Loading label="Загружаем финансы…" /> : (
+      {!data && loading ? <Loading label="Загружаем финансы…" /> : data && (
         <>
           <div className="cards-grid">
             <div className="card">

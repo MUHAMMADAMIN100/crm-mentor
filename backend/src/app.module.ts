@@ -19,6 +19,7 @@ import { AdminModule } from './admin/admin.module';
 import { SubscriptionModule } from './subscription/subscription.module';
 import { PublicModule } from './public/public.module';
 import { AiModule } from './ai/ai.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { AiModule } from './ai/ai.module';
     SubscriptionModule,
     PublicModule,
     AiModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

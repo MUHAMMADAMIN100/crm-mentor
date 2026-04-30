@@ -1,15 +1,13 @@
-import { useEffect, useState } from 'react';
 import { Shell } from '../../components/Shell';
-import { api } from '../../api';
+import { useApi } from '../../hooks';
 import { SkeletonGrid } from '../../components/Skeleton';
 import { NotesCard } from '../../components/NotesCard';
 
 export function AdminHome() {
-  const [stats, setStats] = useState<any>(null);
-  useEffect(() => { api.get('/admin/analytics').then((r) => setStats(r.data)); }, []);
+  const { data: stats, loading } = useApi<any>('/admin/analytics');
   return (
     <Shell title="Главное">
-      {!stats ? <SkeletonGrid count={5} /> : (
+      {!stats && loading ? <SkeletonGrid count={5} /> : (
         <>
           <div className="cards-grid">
             <Stat label="Учителей" value={stats?.teachers ?? '—'} />

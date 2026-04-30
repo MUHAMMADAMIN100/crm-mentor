@@ -1,6 +1,32 @@
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../store';
 import { useState, ReactNode, useEffect } from 'react';
+import { prefetch } from '../api';
+
+/** Map sidebar route → API endpoints to prefetch on link hover. */
+const PREFETCH_MAP: Record<string, () => void> = {
+  '/admin':            () => prefetch('/admin/analytics'),
+  '/admin/teachers':   () => prefetch('/admin/teachers'),
+  '/admin/students':   () => prefetch('/admin/students'),
+  '/admin/courses':    () => prefetch('/admin/courses'),
+  '/admin/finance':    () => prefetch('/admin/finance'),
+  '/admin/analytics':  () => prefetch('/admin/analytics'),
+  '/teacher':          () => prefetch('/teacher/dashboard'),
+  '/teacher/students': () => prefetch('/students'),
+  '/teacher/courses':  () => prefetch('/courses'),
+  '/teacher/groups':   () => prefetch('/groups'),
+  '/teacher/finance':  () => prefetch('/finance/teacher'),
+  '/teacher/messages': () => prefetch('/chat'),
+  '/student':          () => prefetch('/students/me/dashboard'),
+  '/student/courses':  () => prefetch('/courses/me/list'),
+  '/student/messages': () => prefetch('/chat'),
+  '/notes':            () => prefetch('/notes'),
+  '/ai':               () => prefetch('/ai/suggestions'),
+};
+function prefetchRoute(to: string) {
+  const fn = PREFETCH_MAP[to];
+  if (fn) { try { fn(); } catch {} }
+}
 
 interface NavItem { to: string; label: string; ai?: boolean; icon?: ReactNode; }
 
@@ -75,6 +101,8 @@ export function Shell({ title, children }: { title: string; children: ReactNode 
               to={i.to}
               end={i.to === '/teacher' || i.to === '/student' || i.to === '/admin'}
               className={({ isActive }) => `${isActive ? 'active' : ''} ${i.ai ? 'ai-link' : ''}`}
+              onMouseEnter={() => prefetchRoute(i.to)}
+              onTouchStart={() => prefetchRoute(i.to)}
             >
               {i.ai && <span className="ai-dot" />}
               {i.icon && <span className="nav-ico">{i.icon}</span>}

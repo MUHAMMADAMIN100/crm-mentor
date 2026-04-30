@@ -1,43 +1,47 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Shell } from '../../components/Shell';
-import { api } from '../../api';
+import { api, invalidateApi, mutateCache } from '../../api';
+import { useApi } from '../../hooks';
 import { Modal } from '../../components/Modal';
 import { SkeletonTable } from '../../components/Skeleton';
 import { toast, confirmDialog } from '../../store';
 
 export function AdminTeachers() {
-  const [list, setList] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: list, loading, refetch } = useApi<any[]>('/admin/teachers');
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ fullName: '', login: '', password: '' });
   const [subOpen, setSubOpen] = useState<any>(null);
   const [saving, setSaving] = useState(false);
 
-  function load() {
-    setLoading(true);
-    api.get('/admin/teachers').then((r) => setList(r.data)).finally(() => setLoading(false));
-  }
-  useEffect(() => { load(); }, []);
-
   async function create(e?: React.FormEvent) {
     e?.preventDefault();
     setSaving(true);
     try {
-      await api.post('/admin/teachers', form);
+      const r = await api.post('/admin/teachers', form);
+      mutateCache<any[]>('/admin/teachers', undefined, (prev) => prev ? [r.data, ...prev] : [r.data]);
+      invalidateApi('/admin/teachers');
       setOpen(false); setForm({ fullName: '', login: '', password: '' });
       toast.success('Учитель создан');
-      load();
-    } catch (err: any) { toast.error(err?.response?.data?.message || 'Не удалось создать'); }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Не удалось создать');
+    }
     finally { setSaving(false); }
   }
 
   async function archive(id: string, archived: boolean) {
+    const prev = list || [];
+    mutateCache<any[]>('/admin/teachers', undefined, (cur) =>
+      (cur || []).map((t) => t.id === id ? { ...t, archived: !archived } : t),
+    );
     try {
       if (archived) await api.patch(`/admin/users/${id}/unarchive`);
       else await api.patch(`/admin/users/${id}/archive`);
+      invalidateApi('/admin/teachers');
       toast.success(archived ? 'Восстановлен' : 'Архивирован');
-      load();
-    } catch { toast.error('Не удалось'); }
+    } catch {
+      mutateCache<any[]>('/admin/teachers', undefined, () => prev);
+      toast.error('Не удалось');
+    }
   }
 
   async function remove(id: string) {
@@ -48,11 +52,16 @@ export function AdminTeachers() {
       okLabel: 'Удалить',
     });
     if (!ok) return;
+    const prev = list || [];
+    mutateCache<any[]>('/admin/teachers', undefined, (cur) => (cur || []).filter((t) => t.id !== id));
     try {
       await api.delete(`/admin/users/${id}`);
+      invalidateApi('/admin/teachers');
       toast.success('Удалён');
-      load();
-    } catch { toast.error('Не удалось удалить'); }
+    } catch {
+      mutateCache<any[]>('/admin/teachers', undefined, () => prev);
+      toast.error('Не удалось удалить');
+    }
   }
 
   return (
@@ -62,14 +71,14 @@ export function AdminTeachers() {
         <button className="btn btn-primary" onClick={() => setOpen(true)}>+ Создать учителя</button>
       </div>
 
-      {loading && list.length === 0 ? (
+      {!list && loading ? (
         <SkeletonTable rows={6} cols={5} />
       ) : (
         <div className="card" style={{ padding: 0 }}>
           <table className="table">
             <thead><tr><th>ФИО</th><th>Логин</th><th>Подписка</th><th>Статус</th><th></th></tr></thead>
             <tbody>
-              {list.map((t) => (
+              {(list || []).map((t) => (
                 <tr key={t.id}>
                   <td>{t.fullName}</td>
                   <td>{t.login}</td>
@@ -82,7 +91,7 @@ export function AdminTeachers() {
                   </td>
                 </tr>
               ))}
-              {list.length === 0 && <tr><td colSpan={5} className="empty">Нет учителей</td></tr>}
+              {(!list || list.length === 0) && <tr><td colSpan={5} className="empty">Нет учителей</td></tr>}
             </tbody>
           </table>
         </div>
@@ -100,7 +109,7 @@ export function AdminTeachers() {
         </form>
       </Modal>
 
-      {subOpen && <SubscriptionModal teacher={subOpen} onClose={() => { setSubOpen(null); load(); }} />}
+      {subOpen && <SubscriptionModal teacher={subOpen} onClose={() => { setSubOpen(null); refetch(); }} />}
     </Shell>
   );
 }
@@ -119,6 +128,7 @@ function SubscriptionModal({ teacher, onClose }: { teacher: any; onClose: () => 
     setSaving(true);
     try {
       await api.patch(`/admin/teachers/${teacher.id}/subscription`, form);
+      invalidateApi('/admin/teachers');
       toast.success('Подписка обновлена');
       onClose();
     } catch { toast.error('Не удалось обновить'); } finally { setSaving(false); }

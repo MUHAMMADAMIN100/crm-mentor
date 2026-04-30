@@ -1,23 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Shell } from '../../components/Shell';
-import { api } from '../../api';
+import { api, invalidateApi, mutateCache } from '../../api';
+import { useApi } from '../../hooks';
 import { Modal } from '../../components/Modal';
 import { SkeletonTable } from '../../components/Skeleton';
 import { toast, confirmDialog } from '../../store';
 
 export function TeacherStudents() {
-  const [list, setList] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: list, loading, refetch } = useApi<any[]>('/students');
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ fullName: '', login: '', password: '', individualPrice: 0 });
   const [saving, setSaving] = useState(false);
-
-  function load() {
-    setLoading(true);
-    api.get('/students').then((r) => setList(r.data)).finally(() => setLoading(false));
-  }
-  useEffect(load, []);
 
   async function create() {
     if (!form.fullName.trim() || !form.login.trim() || !form.password.trim()) {
@@ -26,23 +20,43 @@ export function TeacherStudents() {
     }
     setSaving(true);
     try {
-      await api.post('/students', form);
+      const r = await api.post('/students', form);
+      // Append optimistically so the new row is visible immediately
+      mutateCache<any[]>('/students', undefined, (prev) => {
+        const item = {
+          id: r.data?.studentProfile?.id || `tmp-${Date.now()}`,
+          balance: 0,
+          allowReschedule: false,
+          individualPrice: form.individualPrice,
+          user: { id: r.data?.id, fullName: form.fullName, login: form.login },
+        };
+        return prev ? [item, ...prev] : [item];
+      });
+      invalidateApi('/students');
+      refetch();
       setOpen(false);
       setForm({ fullName: '', login: '', password: '', individualPrice: 0 });
       toast.success('Ученик создан');
-      load();
-    } catch (e: any) { toast.error(e?.response?.data?.message || 'Не удалось создать'); }
-    finally { setSaving(false); }
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'Не удалось создать');
+    } finally { setSaving(false); }
   }
 
   async function archive(id: string) {
     const ok = await confirmDialog({ title: 'Архивировать ученика?', body: 'Ученик не сможет войти, но данные сохранятся.', okLabel: 'Архивировать' });
     if (!ok) return;
+    // Optimistic: drop from list immediately
+    const prev = list || [];
+    mutateCache<any[]>('/students', undefined, (cur) => (cur || []).filter((s) => s.id !== id));
     try {
       await api.patch(`/students/${id}/archive`);
+      invalidateApi('/students');
       toast.success('Архивирован');
-      load();
-    } catch { toast.error('Не удалось'); }
+    } catch {
+      // Rollback
+      mutateCache<any[]>('/students', undefined, () => prev);
+      toast.error('Не удалось');
+    }
   }
 
   return (
@@ -52,12 +66,12 @@ export function TeacherStudents() {
         <button className="btn btn-primary" onClick={() => setOpen(true)}>+ Добавить ученика</button>
       </div>
 
-      {loading && list.length === 0 ? <SkeletonTable rows={5} cols={5} /> : (
+      {loading && !list ? <SkeletonTable rows={5} cols={5} /> : (
         <div className="card" style={{ padding: 0 }}>
           <table className="table">
             <thead><tr><th>ФИО</th><th>Логин</th><th>Баланс</th><th>Перенос</th><th></th></tr></thead>
             <tbody>
-              {list.map((s) => (
+              {(list || []).map((s) => (
                 <tr key={s.id}>
                   <td><Link to={`/teacher/students/${s.id}`}>{s.user.fullName}</Link></td>
                   <td>{s.user.login}</td>
@@ -69,7 +83,7 @@ export function TeacherStudents() {
                   </td>
                 </tr>
               ))}
-              {list.length === 0 && <tr><td colSpan={5} className="empty">Нет учеников</td></tr>}
+              {(!list || list.length === 0) && <tr><td colSpan={5} className="empty">Нет учеников</td></tr>}
             </tbody>
           </table>
         </div>

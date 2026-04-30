@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Shell } from '../../components/Shell';
-import { api } from '../../api';
+import { api, invalidateApi, mutateCache } from '../../api';
 import { useAuth, toast } from '../../store';
+import { useApi } from '../../hooks';
 import { Loading } from '../../components/Loading';
 import { Modal } from '../../components/Modal';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 
 export function TeacherFinance() {
-  const [data, setData] = useState<any>(null);
+  const { data, refetch: load } = useApi<any>('/finance/teacher');
   const { user, refreshMe } = useAuth();
   const [currency, setCurrency] = useState((user as any)?.teacherCurrency || 'RUB');
   const [period, setPeriod] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
@@ -18,12 +17,11 @@ export function TeacherFinance() {
   const [generating, setGenerating] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
 
-  function load() { api.get('/finance/teacher').then((r) => setData(r.data)).catch(() => toast.error('Не удалось загрузить финансы')); }
-  useEffect(load, []);
-
   async function saveCurrency() {
     try {
+      // Optimistic: bump cached currency immediately
       await api.patch('/teacher/currency', { currency });
+      invalidateApi('/finance/teacher');
       await refreshMe();
       toast.success('Валюта обновлена');
       load();
@@ -80,10 +78,14 @@ export function TeacherFinance() {
     if (!data || !reportRef.current) return;
     setGenerating(true);
     try {
-      // Make hidden report visible to html2canvas (off-screen but rendered)
+      // Lazy-load PDF deps so the main bundle stays small
+      const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
+        import('jspdf'),
+        import('html2canvas'),
+      ]);
+
       const node = reportRef.current;
       node.style.display = 'block';
-      // Wait one tick so layout settles
       await new Promise((r) => requestAnimationFrame(() => r(null)));
 
       const canvas = await html2canvas(node, {
@@ -129,6 +131,8 @@ export function TeacherFinance() {
   }
 
   if (!data) return <Shell title="Финансы"><Loading label="Загружаем финансы…" /></Shell>;
+  // Note: data may be slightly stale on first paint while cache revalidates;
+  // user sees content instantly instead of a skeleton.
 
   const cur = data.currency || 'RUB';
 
@@ -496,11 +500,24 @@ function TopupModal({ student, cur, onClose }: any) {
   async function save() {
     if (!amount || amount <= 0) { toast.warning('Сумма должна быть положительной'); return; }
     setSaving(true);
+    // Optimistic: bump balance in cache instantly so UI feels instant
+    mutateCache<any>('/finance/teacher', undefined, (prev) => {
+      if (!prev) return prev as any;
+      return {
+        ...prev,
+        students: prev.students.map((s: any) =>
+          s.id === student.id ? { ...s, balance: (s.balance || 0) + amount } : s,
+        ),
+      };
+    });
     try {
       await api.post(`/finance/teacher/students/${student.id}/topup`, { amount, comment });
+      invalidateApi('/finance/teacher');
       toast.success(`Баланс пополнен: +${amount} ${cur}`);
       onClose(true);
     } catch (e: any) {
+      // Rollback
+      invalidateApi('/finance/teacher');
       toast.error(e?.response?.data?.message || 'Ошибка пополнения');
     } finally { setSaving(false); }
   }

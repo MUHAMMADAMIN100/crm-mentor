@@ -1,18 +1,13 @@
-import { useEffect, useState } from 'react';
 import { Shell } from '../../components/Shell';
-import { api } from '../../api';
+import { useApi } from '../../hooks';
 import { TreeView } from '../../components/Tree';
 import { SkeletonCard, SkeletonGrid } from '../../components/Skeleton';
 import { NotesCard } from '../../components/NotesCard';
 
 export function TeacherHome() {
-  const [data, setData] = useState<any>(null);
+  const { data, loading } = useApi<any>('/teacher/dashboard');
 
-  useEffect(() => {
-    api.get('/teacher/dashboard').then((r) => setData(r.data));
-  }, []);
-
-  if (!data) {
+  if (!data && loading) {
     return (
       <Shell title="Главное">
         <SkeletonGrid count={3} />
