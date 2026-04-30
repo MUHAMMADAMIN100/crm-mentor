@@ -542,6 +542,11 @@
 html, body { overflow-x: hidden; -webkit-text-size-adjust: 100%; }
 img, video, canvas, svg { max-width: 100%; }
 table { max-width: 100%; }
+main.content { max-width: 100%; overflow-x: hidden; }
+.cards-grid { max-width: 100%; }
+/* List items: ensure spacing between label/value never collapses */
+.list-item { gap: 12px; }
+.list-item > * { min-width: 0; }
 
 /* On iOS, font-size < 16px on inputs causes auto-zoom; bump on touch screens */
 @media (hover: none) and (pointer: coarse) {
@@ -561,8 +566,11 @@ table { max-width: 100%; }
   .fin-stats { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
 }
 
-/* ---------- Large tablet / iPad landscape (~1024px) ---------- */
-@media (max-width: 1024px) {
+/* ---------- Large tablet / iPad landscape (901-1024px) ---------- */
+/* Note: bounded with min-width: 901 so these rules never override the
+   ≤900px hamburger-mode below (avoids cascade conflicts that previously
+   forced the sidebar to keep reserving 220px on mobile/tablet). */
+@media (min-width: 901px) and (max-width: 1024px) {
   .app-shell { grid-template-columns: 220px 1fr; }
   .sidebar { padding: 18px 12px; }
   .sidebar .logo { font-size: 20px; margin-bottom: 22px; }
@@ -581,6 +589,19 @@ table { max-width: 100%; }
 
 /* ---------- Tablet (≤900px) — hamburger sidebar ---------- */
 @media (max-width: 900px) {
+  /* Force single-column layout regardless of source order of earlier
+     desktop/laptop rules — sidebar is fixed and should not reserve
+     a grid track on tablet/mobile. */
+  .app-shell { grid-template-columns: 1fr !important; }
+  .cards-grid { grid-template-columns: 1fr !important; gap: 12px; }
+  .cards-grid > * {
+    min-width: 0;
+    max-width: 100%;
+    grid-column: auto !important;
+  }
+  .course-shell { grid-template-columns: 1fr !important; }
+  .chat-shell { grid-template-columns: 1fr !important; }
+
   .topbar .title { font-size: 17px; }
   .topbar { padding: 11px 14px; gap: 8px; }
   .topbar .right { gap: 10px; }
