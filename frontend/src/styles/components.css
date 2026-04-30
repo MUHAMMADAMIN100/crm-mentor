@@ -348,6 +348,38 @@ main.content > .miz-loader {
   main.content { padding: 14px 12px; }
 }
 
+/* ---------- Admin KPI grid ---------- */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.kpi-card {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 96px;
+}
+.kpi-card .kpi-label {
+  font-size: 12px;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 500;
+}
+.kpi-card .kpi-value {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+  margin-top: 2px;
+}
+.kpi-card .kpi-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 /* ---------- Finance pro ---------- */
 .fin-stats {
   display: grid;

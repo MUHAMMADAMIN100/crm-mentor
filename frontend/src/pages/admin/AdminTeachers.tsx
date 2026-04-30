@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Shell } from '../../components/Shell';
 import { api, invalidateApi, mutateCache } from '../../api';
 import { useApi } from '../../hooks';
@@ -7,6 +7,8 @@ import { SkeletonTable } from '../../components/Skeleton';
 import { toast, confirmDialog } from '../../store';
 import { useT } from '../../i18n';
 
+type StatusFilter = 'ALL' | 'active' | 'archived' | 'TRIAL' | 'ACTIVE' | 'EXPIRED';
+
 export function AdminTeachers() {
   const { t } = useT();
   const { data: list, loading, refetch } = useApi<any[]>('/admin/teachers');
@@ -14,6 +16,27 @@ export function AdminTeachers() {
   const [form, setForm] = useState({ fullName: '', login: '', password: '' });
   const [subOpen, setSubOpen] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<StatusFilter>('ALL');
+
+  const visible = useMemo(() => {
+    if (!list) return [];
+    let v = list.slice();
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      v = v.filter((u: any) =>
+        (u.fullName || '').toLowerCase().includes(q) ||
+        (u.login || '').toLowerCase().includes(q) ||
+        (u.email || '').toLowerCase().includes(q),
+      );
+    }
+    if (filter === 'active') v = v.filter((u: any) => !u.archived);
+    else if (filter === 'archived') v = v.filter((u: any) => u.archived);
+    else if (filter === 'TRIAL' || filter === 'ACTIVE' || filter === 'EXPIRED') {
+      v = v.filter((u: any) => u.teacherSubscription?.status === filter);
+    }
+    return v;
+  }, [list, search, filter]);
 
   async function create(e?: React.FormEvent) {
     e?.preventDefault();
@@ -68,7 +91,17 @@ export function AdminTeachers() {
 
   return (
     <Shell title={t('nav.teachers')}>
-      <div className="flex" style={{ marginBottom: 16 }}>
+      <div className="fin-toolbar" style={{ marginBottom: 16 }}>
+        <input className="input" placeholder="🔍 Поиск по ФИО / логину / email" style={{ maxWidth: 320 }}
+          value={search} onChange={(e) => setSearch(e.target.value)} />
+        <select className="select" style={{ maxWidth: 200 }} value={filter} onChange={(e) => setFilter(e.target.value as StatusFilter)}>
+          <option value="ALL">Все ({list?.length ?? 0})</option>
+          <option value="active">Активные</option>
+          <option value="archived">Архив</option>
+          <option value="ACTIVE">Подписка: Active</option>
+          <option value="TRIAL">Подписка: Trial</option>
+          <option value="EXPIRED">Подписка: Expired</option>
+        </select>
         <div className="spacer" />
         <button className="btn btn-primary" onClick={() => setOpen(true)}>{t('btn.addTeacher')}</button>
       </div>
@@ -80,7 +113,7 @@ export function AdminTeachers() {
           <table className="table">
             <thead><tr><th>{t('students.fullName')}</th><th>{t('profile.login')}</th><th>{t('teachers.subscription')}</th><th>{t('calendar.status')}</th><th></th></tr></thead>
             <tbody>
-              {(list || []).map((tc: any) => (
+              {(visible || []).map((tc: any) => (
                 <tr key={tc.id}>
                   <td>{tc.fullName}</td>
                   <td>{tc.login}</td>
@@ -93,7 +126,7 @@ export function AdminTeachers() {
                   </td>
                 </tr>
               ))}
-              {(!list || list.length === 0) && <tr><td colSpan={5} className="empty">{t('empty.noTeachers')}</td></tr>}
+              {visible.length === 0 && <tr><td colSpan={5} className="empty">{search || filter !== 'ALL' ? t('empty.noFound') : t('empty.noTeachers')}</td></tr>}
             </tbody>
           </table>
         </div>

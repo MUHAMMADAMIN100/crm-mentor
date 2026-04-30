@@ -25,4 +25,5 @@ export class AdminController {
   @Get('courses') courses() { return this.svc.listCourses(); }
   @Get('finance') finance() { return this.svc.finance(); }
   @Get('analytics') analytics() { return this.svc.analytics(); }
+  @Get('dashboard') dashboard() { return this.svc.dashboard(); }
 }
