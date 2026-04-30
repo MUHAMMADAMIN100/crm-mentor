@@ -43,7 +43,11 @@ export class AiService {
       { role: 'user', content: question },
     ];
 
-    // Приоритет: Gemini → Groq → fallback
+    // Priority: Gemini → Groq → templated fallback.
+    // callGemini / callGroq return null when the provider failed in a way
+    // that's worth retrying with the next provider (overload, rate-limit,
+    // network blip). They return a value only on a real reply or on a
+    // hard config error worth surfacing.
     const geminiKey = process.env.GEMINI_API_KEY;
     if (geminiKey) {
       const r = await this.callGemini(geminiKey, systemPrompt, history, question);
@@ -58,28 +62,39 @@ export class AiService {
   }
 
   private async callGroq(apiKey: string, messages: ChatMessage[]) {
-    try {
-      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model: process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
-          messages,
-          temperature: 0.3,
-          max_tokens: 800,
-        }),
-      });
-      if (!r.ok) {
-        console.error('[AI] Groq error', r.status, await r.text());
-        return null;
+    // Try a couple of Groq models in case the primary one is unavailable.
+    const models = process.env.GROQ_MODEL
+      ? [process.env.GROQ_MODEL]
+      : [
+          'llama-3.3-70b-versatile',
+          'llama-3.1-70b-versatile',
+          'llama-3.1-8b-instant',
+          'mixtral-8x7b-32768',
+        ];
+    for (const model of models) {
+      try {
+        const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({
+            model,
+            messages,
+            temperature: 0.3,
+            max_tokens: 800,
+          }),
+        });
+        if (!r.ok) {
+          console.error(`[AI] Groq ${model} error ${r.status}`);
+          continue;       // try next model
+        }
+        const j: any = await r.json();
+        const answer = j.choices?.[0]?.message?.content?.trim() || '…';
+        return { answer, model: j.model || `groq/${model}` };
+      } catch (e: any) {
+        console.error(`[AI] Groq ${model} exception`, e?.message);
       }
-      const j: any = await r.json();
-      const answer = j.choices?.[0]?.message?.content?.trim() || 'Пустой ответ';
-      return { answer, model: j.model || 'groq' };
-    } catch (e: any) {
-      console.error('[AI] Groq exception', e?.message);
-      return null;
     }
+    return null;
   }
 
   private async callGemini(
@@ -88,14 +103,16 @@ export class AiService {
     history: ChatMessage[],
     question: string,
   ) {
-    // Список моделей в порядке предпочтения; первая ответившая 200 — используется.
+    // Models in priority order; first one that returns 200 wins.
+    // Sorted from most likely to be available (smaller / older flash) to newest.
     const models = process.env.GEMINI_MODEL
       ? [process.env.GEMINI_MODEL]
       : [
-          'gemini-2.5-flash',
           'gemini-2.0-flash',
           'gemini-2.0-flash-001',
+          'gemini-1.5-flash-latest',
           'gemini-1.5-flash',
+          'gemini-2.5-flash',
         ];
 
     const contents: any[] = [];
@@ -114,6 +131,12 @@ export class AiService {
       generationConfig: { temperature: 0.3, maxOutputTokens: 1000 },
     });
 
+    // Retriable status codes: 404 (model not found / regional), 408 (timeout),
+    // 429 (rate-limit), 500/502/503/504 (overload/transient). On any of those,
+    // we try the next model and ultimately fall through to Groq.
+    const retriable = (status: number) =>
+      status === 404 || status === 408 || status === 429 || (status >= 500 && status < 600);
+
     let lastErr = '';
     for (const model of models) {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
@@ -127,22 +150,25 @@ export class AiService {
           const j: any = await r.json();
           const answer =
             j.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('').trim() ||
-            'Пустой ответ';
+            '…';
           return { answer, model: `gemini/${model}` };
         }
         const txt = await r.text();
         console.error(`[AI] Gemini ${model} error ${r.status}: ${txt.slice(0, 200)}`);
-        lastErr = `${r.status}: ${txt.slice(0, 200)}`;
-        // Если 404 — пробуем следующую модель; иначе выходим (например 400/401 не починятся другой моделью)
-        if (r.status !== 404) {
-          return { answer: `Gemini error ${r.status}: ${txt.slice(0, 400)}`, model: 'gemini-error' };
-        }
+        lastErr = `${r.status}`;
+        if (retriable(r.status)) continue;       // try next model
+        // Hard error (400 = bad request, 401 = bad key, 403 = forbidden, etc.)
+        // Stop trying Gemini variants and fall through to Groq.
+        return null;
       } catch (e: any) {
         console.error(`[AI] Gemini ${model} exception`, e?.message);
         lastErr = e?.message || String(e);
+        // Network errors → try next model
       }
     }
-    return { answer: `Все модели Gemini недоступны. Последняя ошибка: ${lastErr}`, model: 'gemini-error' };
+    // All Gemini models exhausted (overload / 404). Let outer ask() try Groq.
+    console.error(`[AI] all Gemini models unavailable, last err: ${lastErr}`);
+    return null;
   }
 
   private buildSystemPrompt(ctx: RoleContext): string {
