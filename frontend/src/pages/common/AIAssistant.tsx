@@ -68,10 +68,19 @@ export function AIAssistantPage() {
             <div className="ai-title">{t('ai.title')}</div>
             <div className="ai-subtitle">{t('ai.subtitle')}{t(roleKey)}</div>
           </div>
-          {messages.length > 0 && (
-            <button className="btn btn-sm btn-ghost" style={{ marginLeft: 'auto' }} onClick={clearChat} title={t('ai.clearTitle')}>{t('ai.clearChat')}</button>
-          )}
-          <div className="ai-model-pill"><span className="dot" /> {model || 'AI'}</div>
+          <div className="ai-header-actions">
+            <div className="ai-model-pill"><span className="dot" /> {model || 'AI'}</div>
+            {messages.length > 0 && (
+              <button className="ai-clear-btn" onClick={clearChat} title={t('ai.clearTitle')} aria-label={t('ai.clearChat')}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                  <path d="M10 11v6M14 11v6" />
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="ai-body" ref={bodyRef}>
