@@ -85,13 +85,13 @@ function BlockView({ block, onDone }: any) {
   return null;
 }
 
-async function markDone(blockId: string, extra?: any) {
-  try {
-    await api.post(`/progress/blocks/${blockId}/done`, { data: extra });
-  } catch (e: any) {
-    toast.error(e?.response?.data?.message || 'mark failed');
-    throw e;
-  }
+/** Fire-and-forget mark — UI flips done state instantly, server is hit in background. */
+function markDoneOpt(blockId: string, extra?: any, onErrorRevert?: () => void) {
+  api.post(`/progress/blocks/${blockId}/done`, { data: extra })
+    .catch((e: any) => {
+      toast.error(e?.response?.data?.message || 'mark failed');
+      onErrorRevert?.();
+    });
 }
 
 function VideoBlock({ block, onDone }: any) {
@@ -102,8 +102,11 @@ function VideoBlock({ block, onDone }: any) {
       <h4>{t('block.VIDEO')}</h4>
       {block.videoUrls.map((u: string) => <div key={u}><a href={u} target="_blank" rel="noreferrer">{u}</a></div>)}
       <div style={{ marginTop: 8 }}>
-        <button className="btn btn-primary" disabled={done} onClick={async () => {
-          try { await markDone(block.id); setDone(true); toast.success(t('btn.viewed')); onDone(); } catch {}
+        <button className="btn btn-primary" disabled={done} onClick={() => {
+          setDone(true);    // optimistic
+          toast.success(t('btn.viewed'));
+          markDoneOpt(block.id, undefined, () => setDone(false));
+          onDone();
         }}>{done ? t('btn.viewedDone') : t('btn.viewed')}</button>
       </div>
     </div>
@@ -120,12 +123,24 @@ function TextBlock({ block, onDone }: any) {
       {block.miniQuizQuestion ? (
         <div style={{ marginTop: 10 }}>
           <p>{block.miniQuizQuestion}</p>
-          <button className="btn btn-sm" disabled={done} onClick={async () => { try { await markDone(block.id, { answer: true }); setDone(true); toast.success(t('toast.success')); onDone(); } catch {} }}>{t('btn.true')}</button>{' '}
-          <button className="btn btn-sm" disabled={done} onClick={async () => { try { await markDone(block.id, { answer: false }); setDone(true); toast.success(t('toast.success')); onDone(); } catch {} }}>{t('btn.false')}</button>
+          <button className="btn btn-sm" disabled={done} onClick={() => {
+            setDone(true); toast.success(t('toast.success'));
+            markDoneOpt(block.id, { answer: true }, () => setDone(false));
+            onDone();
+          }}>{t('btn.true')}</button>{' '}
+          <button className="btn btn-sm" disabled={done} onClick={() => {
+            setDone(true); toast.success(t('toast.success'));
+            markDoneOpt(block.id, { answer: false }, () => setDone(false));
+            onDone();
+          }}>{t('btn.false')}</button>
         </div>
       ) : (
         <div style={{ marginTop: 8 }}>
-          <button className="btn btn-primary" disabled={done} onClick={async () => { try { await markDone(block.id); setDone(true); toast.success(t('btn.read')); onDone(); } catch {} }}>{done ? t('btn.readDone') : t('btn.read')}</button>
+          <button className="btn btn-primary" disabled={done} onClick={() => {
+            setDone(true); toast.success(t('btn.read'));
+            markDoneOpt(block.id, undefined, () => setDone(false));
+            onDone();
+          }}>{done ? t('btn.readDone') : t('btn.read')}</button>
         </div>
       )}
     </div>
@@ -140,7 +155,11 @@ function FileBlock({ block, onDone }: any) {
       <h4>{t('block.FILE')}</h4>
       {block.fileUrls.map((u: string) => <div key={u}><a href={u} target="_blank" rel="noreferrer">{u}</a></div>)}
       <div style={{ marginTop: 8 }}>
-        <button className="btn btn-primary" disabled={done} onClick={async () => { try { await markDone(block.id); setDone(true); toast.success(t('toast.success')); onDone(); } catch {} }}>{done ? t('btn.gotItDone') : t('btn.gotIt')}</button>
+        <button className="btn btn-primary" disabled={done} onClick={() => {
+          setDone(true); toast.success(t('toast.success'));
+          markDoneOpt(block.id, undefined, () => setDone(false));
+          onDone();
+        }}>{done ? t('btn.gotItDone') : t('btn.gotIt')}</button>
       </div>
     </div>
   );
@@ -149,7 +168,6 @@ function FileBlock({ block, onDone }: any) {
 function WrittenBlock({ block, onDone }: any) {
   const { t } = useT();
   const [text, setText] = useState('');
-  const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   return (
     <div className="card">
@@ -157,12 +175,11 @@ function WrittenBlock({ block, onDone }: any) {
       <p style={{ whiteSpace: 'pre-wrap' }}>{block.writtenPrompt}</p>
       <textarea className="textarea" placeholder={block.writtenHint || t('block.written.placeholder')} value={text} onChange={(e) => setText(e.target.value)} disabled={done} style={{ minHeight: 120 }} />
       <div style={{ marginTop: 8 }}>
-        <button className="btn btn-primary" disabled={!text.trim() || submitting || done} onClick={async () => {
-          setSubmitting(true);
-          try { await markDone(block.id, { text }); setDone(true); toast.success(t('toast.success')); onDone(); }
-          catch {}
-          finally { setSubmitting(false); }
-        }}>{done ? t('btn.gotItDone') : submitting ? t('status.sending') : t('btn.send')}</button>
+        <button className="btn btn-primary" disabled={!text.trim() || done} onClick={() => {
+          setDone(true); toast.success(t('toast.success'));
+          markDoneOpt(block.id, { text }, () => setDone(false));
+          onDone();
+        }}>{done ? t('btn.gotItDone') : t('btn.send')}</button>
       </div>
     </div>
   );

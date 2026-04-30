@@ -15,11 +15,15 @@ export function SettingsPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
+    // Optimistic UX: clear fields and pre-show success — rollback on error
+    const o = oldP, n = newP;
+    setOld(''); setNew('');
+    toast.success(t('auth.passwordUpdated'));
     try {
-      await api.post('/auth/change-password', { oldPassword: oldP, newPassword: newP });
-      toast.success(t('auth.passwordUpdated'));
-      setOld(''); setNew('');
+      await api.post('/auth/change-password', { oldPassword: o, newPassword: n });
     } catch (e: any) {
+      // Restore fields and show actual error
+      setOld(o); setNew(n);
       toast.error(e?.response?.data?.message || t('toast.error'));
     } finally { setSaving(false); }
   }

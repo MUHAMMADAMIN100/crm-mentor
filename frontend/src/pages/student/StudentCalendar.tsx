@@ -48,11 +48,19 @@ export function StudentCalendar() {
     if (isSameDay(old, targetDay)) return;
     const newDate = new Date(targetDay);
     newDate.setHours(old.getHours(), old.getMinutes(), 0, 0);
+    // Optimistic update
+    const prev = data;
+    setData((d: any) => ({
+      ...d,
+      events: d.events.map((x: any) => x.id === id ? { ...x, startAt: newDate.toISOString() } : x),
+    }));
     try {
       await api.patch(`/calendar/events/${id}`, { startAt: newDate.toISOString() });
       toast.success(t('calendar.movedTo'));
-      load();
-    } catch { toast.error(t('toast.notUpdated')); }
+    } catch {
+      setData(prev);
+      toast.error(t('toast.notUpdated'));
+    }
   }
 
   return (
@@ -190,10 +198,10 @@ function StudentEventActions({ ev, onClose }: { ev: any; onClose: (r: boolean) =
       onClose={(s: boolean) => { setEditing(false); if (s) onClose(true); }} />;
   }
   async function del() {
+    onClose(true);  // close modal & let parent reload — server handles deletion
     try {
       await api.delete(`/calendar/events/${ev.id}`);
       toast.success(t('calendar.eventDeleted'));
-      onClose(true);
     } catch { toast.error(t('toast.notDeleted')); }
   }
   return (

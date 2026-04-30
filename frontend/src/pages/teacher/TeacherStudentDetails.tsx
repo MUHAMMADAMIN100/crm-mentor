@@ -19,28 +19,46 @@ export function TeacherStudentDetails() {
   useEffect(load, [id]);
 
   async function toggleReschedule() {
+    const next = !s.allowReschedule;
+    setS((cur: any) => ({ ...cur, allowReschedule: next }));   // optimistic
     try {
-      await api.patch(`/students/${id}`, { allowReschedule: !s.allowReschedule });
+      await api.patch(`/students/${id}`, { allowReschedule: next });
       toast.success(t('finance.settings'));
-      load();
-    } catch { toast.error(t('toast.notUpdated')); }
+    } catch {
+      setS((cur: any) => ({ ...cur, allowReschedule: !next }));
+      toast.error(t('toast.notUpdated'));
+    }
   }
   async function setPrice(v: number) {
+    const old = s.individualPrice;
+    setS((cur: any) => ({ ...cur, individualPrice: v }));   // optimistic
     try {
       await api.patch(`/students/${id}`, { individualPrice: v });
       toast.success(t('finance.priceUpdated'));
-      load();
-    } catch { toast.error(t('toast.notUpdated')); }
+    } catch {
+      setS((cur: any) => ({ ...cur, individualPrice: old }));
+      toast.error(t('toast.notUpdated'));
+    }
   }
   async function doTopup() {
     if (!topup.amount || topup.amount <= 0) { toast.warning(t('finance.topup.errPositive')); return; }
+    const amount = topup.amount;
+    const comment = topup.comment;
     setTopping(true);
+    // Optimistic: bump balance and prepend payment row
+    const prev = s;
+    setS((cur: any) => ({
+      ...cur,
+      balance: (cur.balance || 0) + amount,
+      payments: [{ id: `tmp-${Date.now()}`, kind: 'TOPUP', amount, comment, createdAt: new Date().toISOString() }, ...(cur.payments || [])],
+    }));
+    setTopup({ amount: 0, comment: '' });
     try {
-      await api.post(`/finance/teacher/students/${id}/topup`, topup);
-      toast.success(`${t('finance.topup.success')} +${topup.amount}`);
-      setTopup({ amount: 0, comment: '' });
-      load();
+      await api.post(`/finance/teacher/students/${id}/topup`, { amount, comment });
+      toast.success(`${t('finance.topup.success')} +${amount}`);
+      load();        // refresh in background to get the real payment row
     } catch (e: any) {
+      setS(prev);
       toast.error(e?.response?.data?.message || t('finance.topup.err'));
     } finally {
       setTopping(false);

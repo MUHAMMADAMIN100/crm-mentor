@@ -86,46 +86,72 @@ export function TeacherCalendar() {
     }
   }
 
-  /** Drag-drop: move event to another day, keeping the time. */
+  /** Drag-drop: move event to another day, keeping the time. Optimistic. */
   async function handleEventMove(eventId: string, targetDay: Date) {
     const prefix = eventId[0];
     const id = eventId.slice(1);
-    if (prefix === 'L') {
-      const l = data.lessons.find((x: any) => x.id === id);
-      if (!l) return;
-      const old = new Date(l.startAt);
-      if (isSameDay(old, targetDay)) return;
-      const newDate = new Date(targetDay);
-      newDate.setHours(old.getHours(), old.getMinutes(), 0, 0);
-      try {
-        await api.patch(`/calendar/lessons/${id}`, { startAt: newDate.toISOString() });
-        toast.success(t('calendar.movedTo'));
-        load();
-      } catch { toast.error(t('toast.notUpdated')); }
-    } else if (prefix === 'F') {
-      const s = data.freeSlots.find((x: any) => x.id === id);
-      if (!s) return;
-      const old = new Date(s.startAt);
-      if (isSameDay(old, targetDay)) return;
-      const newDate = new Date(targetDay);
-      newDate.setHours(old.getHours(), old.getMinutes(), 0, 0);
-      try {
-        await api.patch(`/calendar/free-slots/${id}`, { startAt: newDate.toISOString() });
-        toast.success(t('calendar.movedTo'));
-        load();
-      } catch { toast.error(t('toast.notUpdated')); }
-    } else if (prefix === 'E') {
-      const e = data.events.find((x: any) => x.id === id);
-      if (!e) return;
-      const old = new Date(e.startAt);
-      if (isSameDay(old, targetDay)) return;
-      const newDate = new Date(targetDay);
-      newDate.setHours(old.getHours(), old.getMinutes(), 0, 0);
-      try {
-        await api.patch(`/calendar/events/${id}`, { startAt: newDate.toISOString() });
-        toast.success(t('calendar.movedTo'));
-        load();
-      } catch { toast.error(t('toast.notUpdated')); }
+    const arr = prefix === 'L' ? 'lessons' : prefix === 'F' ? 'freeSlots' : 'events';
+    const url = prefix === 'L' ? `/calendar/lessons/${id}`
+      : prefix === 'F' ? `/calendar/free-slots/${id}`
+      : `/calendar/events/${id}`;
+    const item = (data as any)[arr].find((x: any) => x.id === id);
+    if (!item) return;
+    const old = new Date(item.startAt);
+    if (isSameDay(old, targetDay)) return;
+    const newDate = new Date(targetDay);
+    newDate.setHours(old.getHours(), old.getMinutes(), 0, 0);
+
+    // Optimistic update — UI changes instantly
+    const prev = data;
+    setData((d: any) => ({
+      ...d,
+      [arr]: d[arr].map((x: any) => x.id === id ? { ...x, startAt: newDate.toISOString() } : x),
+    }));
+
+    try {
+      await api.patch(url, { startAt: newDate.toISOString() });
+      toast.success(t('calendar.movedTo'));
+    } catch {
+      // Rollback
+      setData(prev);
+      toast.error(t('toast.notUpdated'));
+    }
+  }
+
+  /** Optimistic delete by event prefix + id. */
+  async function deleteByEventId(eventId: string) {
+    const prefix = eventId[0];
+    const id = eventId.slice(1);
+    const arr = prefix === 'L' ? 'lessons' : prefix === 'F' ? 'freeSlots' : 'events';
+    const url = prefix === 'L' ? `/calendar/lessons/${id}`
+      : prefix === 'F' ? `/calendar/free-slots/${id}`
+      : `/calendar/events/${id}`;
+    const prev = data;
+    setData((d: any) => ({ ...d, [arr]: d[arr].filter((x: any) => x.id !== id) }));
+    try {
+      await api.delete(url);
+    } catch {
+      setData(prev);
+      toast.error(t('toast.notDeleted'));
+      throw new Error('failed');
+    }
+  }
+
+  /** Optimistic complete lesson. */
+  async function completeLessonOpt(id: string) {
+    const prev = data;
+    setData((d: any) => ({
+      ...d,
+      lessons: d.lessons.map((x: any) => x.id === id ? { ...x, status: 'COMPLETED', charged: true } : x),
+    }));
+    try {
+      await api.post(`/calendar/lessons/${id}/complete`);
+      // Refresh in background to get accurate priceCharged etc.
+      load();
+    } catch (e: any) {
+      setData(prev);
+      toast.error(e?.response?.data?.message || t('toast.error'));
+      throw e;
     }
   }
 
@@ -179,18 +205,22 @@ export function TeacherCalendar() {
           students={students}
           groups={groups}
           studentName={pickedEvent.title}
+          onComplete={completeLessonOpt}
+          onDelete={deleteByEventId}
           onClose={(refresh) => { setPickedEvent(null); if (refresh) load(); }}
         />
       )}
       {pickedEvent && pickedEvent.id.startsWith('F') && (
         <FreeSlotActions
           slot={data.freeSlots.find((s: any) => 'F' + s.id === pickedEvent.id)}
+          onDelete={deleteByEventId}
           onClose={(refresh) => { setPickedEvent(null); if (refresh) load(); }}
         />
       )}
       {pickedEvent && pickedEvent.id.startsWith('E') && (
         <EventActions
           ev={data.events.find((e: any) => 'E' + e.id === pickedEvent.id)}
+          onDelete={deleteByEventId}
           onClose={(refresh) => { setPickedEvent(null); if (refresh) load(); }}
         />
       )}
@@ -402,7 +432,7 @@ function EventForm({ day, onClose, initial }: any) {
   );
 }
 
-function LessonActions({ lesson, students, groups, studentName, onClose }: any) {
+function LessonActions({ lesson, students, groups, studentName, onComplete, onDelete, onClose }: any) {
   const { t } = useT();
   const [editing, setEditing] = useState(false);
   if (!lesson) return null;
@@ -425,20 +455,20 @@ function LessonActions({ lesson, students, groups, studentName, onClose }: any) 
   }
 
   async function complete() {
+    onClose(false);
     try {
-      await api.post(`/calendar/lessons/${lesson.id}/complete`);
+      await onComplete(lesson.id);
       toast.success(t('calendar.lessonCompleted'));
-      onClose(true);
-    } catch (e: any) { toast.error(e?.response?.data?.message || t('toast.error')); }
+    } catch {}
   }
   async function del() {
     const ok = await confirmDialog({ title: t('calendar.confirmDelete'), body: t('calendar.confirmDeleteBody'), danger: true, okLabel: t('btn.delete') });
     if (!ok) return;
+    onClose(false);
     try {
-      await api.delete(`/calendar/lessons/${lesson.id}`);
+      await onDelete('L' + lesson.id);
       toast.success(t('calendar.lessonDeleted'));
-      onClose(true);
-    } catch { toast.error(t('toast.notDeleted')); }
+    } catch {}
   }
   return (
     <Modal open onClose={() => onClose(false)} title={studentName || t('calendar.lesson')}>
@@ -457,7 +487,7 @@ function LessonActions({ lesson, students, groups, studentName, onClose }: any) 
   );
 }
 
-function FreeSlotActions({ slot, onClose }: any) {
+function FreeSlotActions({ slot, onDelete, onClose }: any) {
   const { t } = useT();
   const [editing, setEditing] = useState(false);
   if (!slot) return null;
@@ -473,11 +503,11 @@ function FreeSlotActions({ slot, onClose }: any) {
   async function del() {
     const ok = await confirmDialog({ title: t('calendar.confirmDeleteSlot'), danger: true, okLabel: t('btn.delete') });
     if (!ok) return;
+    onClose(false);
     try {
-      await api.delete(`/calendar/free-slots/${slot.id}`);
+      await onDelete('F' + slot.id);
       toast.success(t('calendar.slotDeleted'));
-      onClose(true);
-    } catch { toast.error(t('toast.notDeleted')); }
+    } catch {}
   }
   return (
     <Modal open onClose={() => onClose(false)} title={t('calendar.free')}>
@@ -491,7 +521,7 @@ function FreeSlotActions({ slot, onClose }: any) {
   );
 }
 
-function EventActions({ ev, onClose }: any) {
+function EventActions({ ev, onDelete, onClose }: any) {
   const { t } = useT();
   const [editing, setEditing] = useState(false);
   if (!ev) return null;
@@ -508,11 +538,11 @@ function EventActions({ ev, onClose }: any) {
   async function del() {
     const ok = await confirmDialog({ title: t('calendar.confirmDeleteEvent'), danger: true, okLabel: t('btn.delete') });
     if (!ok) return;
+    onClose(false);
     try {
-      await api.delete(`/calendar/events/${ev.id}`);
+      await onDelete('E' + ev.id);
       toast.success(t('calendar.eventDeleted'));
-      onClose(true);
-    } catch { toast.error(t('toast.notDeleted')); }
+    } catch {}
   }
   return (
     <Modal open onClose={() => onClose(false)} title={ev.title}>

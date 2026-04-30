@@ -28,14 +28,20 @@ export function PublicSlots() {
   async function book() {
     if (!form.name.trim() || !form.contact.trim()) { toast.warning(t('public.fillAll')); return; }
     setBooking(true);
+    // Optimistic: drop the picked slot from local list and show success right away
+    const slug = picked.publicSlug;
+    const id = picked.id;
+    setData((d: any) => ({ ...d, slots: (d.slots || []).filter((s: any) => s.id !== id) }));
+    setPicked(null);
+    setPickedDay(null);
+    setDone(true);
+    toast.success(t('public.success'));
     try {
-      await api.post(`/public/slots/${picked.publicSlug}/book`, form);
-      toast.success(t('public.success'));
-      setDone(true);
-      setPicked(null);
-      setPickedDay(null);
-      load();
+      await api.post(`/public/slots/${slug}/book`, form);
+      load();    // background refresh for accurate state
     } catch (e: any) {
+      load();
+      setDone(false);
       toast.error(e?.response?.data?.message || t('public.errBook'));
     } finally { setBooking(false); }
   }

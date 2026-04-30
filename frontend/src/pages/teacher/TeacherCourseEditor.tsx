@@ -67,18 +67,62 @@ export function TeacherCourseEditor() {
       {adding?.kind === 'module' && (
         <SimpleNameModal title={t('course.newModule')} placeholder={t('course.moduleTitle')} onClose={(name) => {
           setAdding(null);
-          if (name) api.post(`/courses/${id}/modules`, { title: name })
-            .then(() => { load(); toast.success(t('course.moduleCreated')); })
-            .catch(() => toast.error(t('toast.notCreated')));
+          if (!name) return;
+          // Optimistic: insert temp module immediately
+          const tempId = `tmp-${Date.now()}`;
+          setCourse((c: any) => ({
+            ...c,
+            modules: [...c.modules, { id: tempId, title: name, lessons: [], position: c.modules.length, __optimistic: true }],
+          }));
+          api.post(`/courses/${id}/modules`, { title: name })
+            .then((r) => {
+              setCourse((c: any) => ({
+                ...c,
+                modules: c.modules.map((m: any) => m.id === tempId ? { ...r.data, lessons: [] } : m),
+              }));
+              toast.success(t('course.moduleCreated'));
+            })
+            .catch(() => {
+              setCourse((c: any) => ({ ...c, modules: c.modules.filter((m: any) => m.id !== tempId) }));
+              toast.error(t('toast.notCreated'));
+            });
         }} />
       )}
       {adding?.kind === 'lesson' && (
         <SimpleNameModal title={t('course.newLesson')} placeholder={t('course.lessonTitle')} onClose={(name) => {
           const mid = adding.mid;
           setAdding(null);
-          if (name) api.post(`/courses/modules/${mid}/lessons`, { title: name })
-            .then(() => { load(); toast.success(t('course.lessonCreated')); })
-            .catch(() => toast.error(t('toast.notCreated')));
+          if (!name) return;
+          const tempId = `tmp-${Date.now()}`;
+          // Optimistic: insert temp lesson immediately
+          setCourse((c: any) => ({
+            ...c,
+            modules: c.modules.map((m: any) => m.id === mid
+              ? { ...m, lessons: [...m.lessons, { id: tempId, title: name, blocks: [], isHomework: false, __optimistic: true }] }
+              : m,
+            ),
+          }));
+          api.post(`/courses/modules/${mid}/lessons`, { title: name })
+            .then((r) => {
+              setCourse((c: any) => ({
+                ...c,
+                modules: c.modules.map((m: any) => m.id === mid
+                  ? { ...m, lessons: m.lessons.map((l: any) => l.id === tempId ? { ...r.data, blocks: [] } : l) }
+                  : m,
+                ),
+              }));
+              toast.success(t('course.lessonCreated'));
+            })
+            .catch(() => {
+              setCourse((c: any) => ({
+                ...c,
+                modules: c.modules.map((m: any) => m.id === mid
+                  ? { ...m, lessons: m.lessons.filter((l: any) => l.id !== tempId) }
+                  : m,
+                ),
+              }));
+              toast.error(t('toast.notCreated'));
+            });
         }} />
       )}
     </Shell>

@@ -129,12 +129,22 @@ function SubscriptionModal({ teacher, onClose }: { teacher: any; onClose: () => 
   const [saving, setSaving] = useState(false);
   async function save() {
     setSaving(true);
+    // Optimistic: patch the cached teachers list before round-trip
+    mutateCache<any[]>('/admin/teachers', undefined, (cur) =>
+      (cur || []).map((tt: any) => tt.id === teacher.id
+        ? { ...tt, teacherSubscription: { ...(tt.teacherSubscription || {}), ...form } }
+        : tt,
+      ),
+    );
+    onClose();
+    toast.success(t('teachers.subUpdated'));
     try {
       await api.patch(`/admin/teachers/${teacher.id}/subscription`, form);
       invalidateApi('/admin/teachers');
-      toast.success(t('teachers.subUpdated'));
-      onClose();
-    } catch { toast.error(t('toast.notUpdated')); } finally { setSaving(false); }
+    } catch {
+      invalidateApi('/admin/teachers');     // refetch real state on error
+      toast.error(t('toast.notUpdated'));
+    } finally { setSaving(false); }
   }
   return (
     <Modal open onClose={onClose} title={`${t('teachers.subscriptionTitle')} ${teacher.fullName}`}

@@ -38,14 +38,15 @@ export function ProfilePage() {
 
   async function save() {
     setSaving(true);
+    setEditing(false);    // close edit mode immediately (optimistic)
+    toast.success(t('profile.updated'));
     try {
       await api.post('/auth/update-profile', form);
       invalidateApi('/auth/me');
       await refreshMe();
-      toast.success(t('profile.updated'));
-      setEditing(false);
     } catch (e: any) {
       toast.error(e?.response?.data?.message || t('toast.notSaved'));
+      setEditing(true);     // re-open edit on error
     } finally { setSaving(false); }
   }
 
