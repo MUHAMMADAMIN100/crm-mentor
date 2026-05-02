@@ -261,6 +261,26 @@ const ru = {
   'archiveReason.other': 'Другое',
   'archiveReason.placeholder': 'Опишите причину…',
 
+  // Finance — extended columns
+  'admin.fin.col.teacher': 'Учитель',
+  'admin.fin.col.status': 'Статус',
+  'admin.fin.col.type': 'Тариф',
+  'admin.fin.col.amount': 'Сумма',
+  'admin.fin.col.source': 'Способ оплаты',
+  'admin.fin.col.comment': 'Комментарий',
+  'admin.fin.col.actor': 'Кто внёс',
+  'admin.fin.col.until': 'До',
+  'admin.fin.col.updated': 'Обновлено',
+  'admin.fin.sourceAny': 'Способ: любой',
+  'admin.fin.managerAny': 'Менеджер: любой',
+
+  // Course hide / duplicate
+  'admin.course.duplicate': 'Дублировать',
+  'admin.course.duplicated': 'Курс продублирован',
+  'admin.course.hidden': 'Скрыт',
+  'admin.course.hide': 'Скрыть',
+  'admin.course.show': 'Показать',
+
   // Topbar / profile menu
   'menu.profile': 'Профиль',
   'menu.settings': 'Настройки',
@@ -1103,6 +1123,24 @@ const en: typeof ru = {
   'archiveReason.other': 'Other',
   'archiveReason.placeholder': 'Describe the reason…',
 
+  'admin.fin.col.teacher': 'Teacher',
+  'admin.fin.col.status': 'Status',
+  'admin.fin.col.type': 'Plan',
+  'admin.fin.col.amount': 'Amount',
+  'admin.fin.col.source': 'Payment source',
+  'admin.fin.col.comment': 'Comment',
+  'admin.fin.col.actor': 'Recorded by',
+  'admin.fin.col.until': 'Until',
+  'admin.fin.col.updated': 'Updated',
+  'admin.fin.sourceAny': 'Source: any',
+  'admin.fin.managerAny': 'Manager: any',
+
+  'admin.course.duplicate': 'Duplicate',
+  'admin.course.duplicated': 'Course duplicated',
+  'admin.course.hidden': 'Hidden',
+  'admin.course.hide': 'Hide',
+  'admin.course.show': 'Show',
+
   'menu.profile': 'Profile',
   'menu.settings': 'Settings',
   'menu.logout': 'Log out',
@@ -1912,6 +1950,24 @@ const tr: typeof ru = {
   'archiveReason.duplicate': 'Yinelenen',
   'archiveReason.other': 'Diğer',
   'archiveReason.placeholder': 'Nedeni açıklayın…',
+
+  'admin.fin.col.teacher': 'Öğretmen',
+  'admin.fin.col.status': 'Durum',
+  'admin.fin.col.type': 'Tarife',
+  'admin.fin.col.amount': 'Tutar',
+  'admin.fin.col.source': 'Ödeme kaynağı',
+  'admin.fin.col.comment': 'Yorum',
+  'admin.fin.col.actor': 'Kaydeden',
+  'admin.fin.col.until': 'Bitiş',
+  'admin.fin.col.updated': 'Güncellendi',
+  'admin.fin.sourceAny': 'Kaynak: tümü',
+  'admin.fin.managerAny': 'Yönetici: tümü',
+
+  'admin.course.duplicate': 'Çoğalt',
+  'admin.course.duplicated': 'Kurs çoğaltıldı',
+  'admin.course.hidden': 'Gizli',
+  'admin.course.hide': 'Gizle',
+  'admin.course.show': 'Göster',
 
   'menu.profile': 'Profil',
   'menu.settings': 'Ayarlar',

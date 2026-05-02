@@ -83,10 +83,16 @@ export class AdminController {
   @Patch('courses/:id/status') setCourseStatus(@CurrentUser() u, @Param('id') id: string, @Body() body: { status: any }) {
     return this.svc.setCourseStatus(u.id, id, body.status);
   }
+  @Patch('courses/:id/hidden') toggleCourseHidden(@CurrentUser() u, @Param('id') id: string) {
+    return this.svc.toggleCourseHidden(u.id, id);
+  }
+  @Post('courses/:id/duplicate') duplicateCourse(@CurrentUser() u, @Param('id') id: string) {
+    return this.svc.duplicateCourse(u.id, id);
+  }
 
   // ----- Finance / Analytics / Dashboard -----
   @Get('finance') finance(@Query() q: any) {
-    return this.svc.finance({ search: q.search, status: q.status, period: q.period });
+    return this.svc.finance({ search: q.search, status: q.status, period: q.period, source: q.source, managerId: q.managerId });
   }
   @Get('analytics') analytics(@Query() q: any) { return this.svc.analytics({ period: q.period }); }
   @Get('dashboard') dashboard() { return this.svc.dashboard(); }

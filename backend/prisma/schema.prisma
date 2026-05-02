@@ -218,6 +218,8 @@ enum CourseStatus {
 model Course {
   id          String   @id @default(cuid())
   teacherId   String
+  // Hide from learners (and the public catalog) without archiving the course.
+  hidden      Boolean  @default(false)
   teacher     User     @relation("TeacherCourses", fields: [teacherId], references: [id], onDelete: Cascade)
   title       String
   description String?

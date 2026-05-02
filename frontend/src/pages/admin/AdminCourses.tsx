@@ -54,7 +54,10 @@ export function AdminCourses() {
                   <td>{c.teacher
                     ? <Link to={`/admin/teachers/${c.teacher.id}`}>{c.teacher.fullName}</Link>
                     : '—'}</td>
-                  <td><StatusBadge status={c.status} /></td>
+                  <td>
+                    <StatusBadge status={c.status} />
+                    {c.hidden && <span className="status-badge status-muted" style={{ marginLeft: 4 }}>{t('admin.course.hidden')}</span>}
+                  </td>
                   <td>{c._count?.modules}</td><td>{c._count?.accesses}</td>
                 </tr>
               ))}

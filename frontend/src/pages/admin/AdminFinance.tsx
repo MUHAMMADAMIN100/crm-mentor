@@ -12,10 +12,20 @@ type Sort = 'recent' | 'amountDesc' | 'amountAsc' | 'expiringSoon';
 export function AdminFinance() {
   const { t } = useT();
   const [period, setPeriod] = useState('30d');
-  const { data, loading } = useApi<any>(`/admin/finance?period=${period}`);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<Status>('ALL');
+  const [source, setSource] = useState('all');
+  const [managerId, setManagerId] = useState('all');
   const [sort, setSort] = useState<Sort>('recent');
+
+  const url = `/admin/finance?${new URLSearchParams({
+    period,
+    ...(status !== 'ALL' ? { status } : {}),
+    ...(source !== 'all' ? { source } : {}),
+    ...(managerId !== 'all' ? { managerId } : {}),
+  }).toString()}`;
+  const { data, loading } = useApi<any>(url);
+  const { data: managers } = useApi<any[]>('/admin/managers');
 
   const subs = useMemo(() => {
     if (!data?.subscriptions) return [];
@@ -28,7 +38,6 @@ export function AdminFinance() {
         (s.teacher?.email || '').toLowerCase().includes(q),
       );
     }
-    if (status !== 'ALL') list = list.filter((s: any) => s.status === status);
     if (sort === 'amountDesc') list.sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0));
     else if (sort === 'amountAsc') list.sort((a: any, b: any) => (a.amount || 0) - (b.amount || 0));
     else if (sort === 'expiringSoon') list.sort((a: any, b: any) => {
@@ -38,33 +47,57 @@ export function AdminFinance() {
     });
     else list.sort((a: any, b: any) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
     return list;
-  }, [data, search, status, sort]);
+  }, [data, search, sort]);
+
+  // Build the unique source list from current data so the filter reflects reality.
+  const knownSources = useMemo(() => {
+    const set = new Set<string>();
+    (data?.subscriptions || []).forEach((s: any) => { if (s.source) set.add(s.source); });
+    return Array.from(set);
+  }, [data]);
+
+  function rowsForExport() {
+    return subs.map((s: any) => ({
+      Учитель: s.teacher?.fullName || '',
+      Логин: s.teacher?.login || '',
+      Email: s.teacher?.email || '',
+      Статус: s.status,
+      Тариф: s.type || '',
+      'Сумма': s.amount || 0,
+      Валюта: s.currency || 'RUB',
+      'Источник оплаты': s.source || '',
+      Комментарий: s.comment || '',
+      'Кто внёс': s.history?.[0]?.actor?.fullName || '',
+      'Начало': s.startDate ? new Date(s.startDate).toLocaleDateString() : '',
+      'Конец': s.endDate ? new Date(s.endDate).toLocaleDateString() : '',
+      'Обновлено': new Date(s.updatedAt).toLocaleDateString(),
+    }));
+  }
 
   function exportCsv() {
     if (!subs.length) return;
-    const rows: string[][] = [];
-    rows.push(['Учитель', 'Логин', 'Email', 'Статус', 'Тариф', 'Сумма ₽', 'Начало', 'Конец', 'Обновлено']);
-    subs.forEach((s: any) => rows.push([
-      s.teacher?.fullName || '',
-      s.teacher?.login || '',
-      s.teacher?.email || '',
-      s.status,
-      s.type || '',
-      String(s.amount || 0),
-      s.startDate ? new Date(s.startDate).toLocaleDateString() : '',
-      s.endDate ? new Date(s.endDate).toLocaleDateString() : '',
-      new Date(s.updatedAt).toLocaleDateString(),
-    ]));
-    const csv = '﻿' + rows.map((r) => r.map((c) => {
-      const v = String(c).replace(/"/g, '""');
-      return /[",;\n]/.test(v) ? `"${v}"` : v;
-    }).join(';')).join('\n');
+    const rows = rowsForExport();
+    const headers = Object.keys(rows[0]);
+    const csv = '﻿' + [headers, ...rows.map((r: any) => headers.map((h) => r[h]))]
+      .map((r: any[]) => r.map((c) => {
+        const v = String(c).replace(/"/g, '""');
+        return /[",;\n]/.test(v) ? `"${v}"` : v;
+      }).join(';')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `miz-admin-finance-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `miz-finance-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
+  }
+
+  async function exportXlsx() {
+    if (!subs.length) return;
+    const xlsx = await import('xlsx');
+    const ws = xlsx.utils.json_to_sheet(rowsForExport());
+    const wb = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(wb, ws, 'Finance');
+    xlsx.writeFile(wb, `miz-finance-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
   if (!data && loading) return <Shell title={t('finance.title')}><Loading label={t('loader.finance')} /></Shell>;
@@ -85,10 +118,9 @@ export function AdminFinance() {
       </div>
 
       {/* Toolbar */}
-      <div className="fin-toolbar" style={{ marginTop: 16 }}>
-        <input className="input" placeholder={t('admin.fin.search')} style={{ maxWidth: 320 }}
-          value={search} onChange={(e) => setSearch(e.target.value)} />
-        <select className="select" style={{ maxWidth: 160 }} value={status} onChange={(e) => setStatus(e.target.value as Status)}>
+      <div className="admin-toolbar" style={{ marginTop: 16 }}>
+        <input className="input search" placeholder={t('admin.fin.search')} value={search} onChange={(e) => setSearch(e.target.value)} />
+        <select className="select" value={status} onChange={(e) => setStatus(e.target.value as Status)}>
           <option value="ALL">{t('admin.sub.allStatuses')}</option>
           <option value="ACTIVE">ACTIVE</option>
           <option value="TRIAL">TRIAL</option>
@@ -97,19 +129,28 @@ export function AdminFinance() {
           <option value="PAUSED">PAUSED</option>
           <option value="CANCELED">CANCELED</option>
         </select>
-        <select className="select" style={{ maxWidth: 200 }} value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
+        <select className="select" value={source} onChange={(e) => setSource(e.target.value)}>
+          <option value="all">{t('admin.fin.sourceAny')}</option>
+          {knownSources.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select className="select" value={managerId} onChange={(e) => setManagerId(e.target.value)}>
+          <option value="all">{t('admin.fin.managerAny')}</option>
+          {(managers || []).map((m: any) => <option key={m.id} value={m.id}>{m.fullName}</option>)}
+        </select>
+        <select className="select" value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
           <option value="recent">{t('admin.fin.sortRecent')}</option>
           <option value="amountDesc">{t('admin.fin.sortAmountDesc')}</option>
           <option value="amountAsc">{t('admin.fin.sortAmountAsc')}</option>
           <option value="expiringSoon">{t('admin.fin.sortExpiring')}</option>
         </select>
-        <select className="select" style={{ maxWidth: 140 }} value={period} onChange={(e) => setPeriod(e.target.value)}>
+        <select className="select" value={period} onChange={(e) => setPeriod(e.target.value)} style={{ maxWidth: 120 }}>
           <option value="7d">7 дн.</option>
           <option value="30d">30 дн.</option>
           <option value="90d">90 дн.</option>
         </select>
         <div className="spacer" />
         <button className="btn" onClick={exportCsv}>⬇ CSV</button>
+        <button className="btn" onClick={exportXlsx}>⬇ XLSX</button>
       </div>
 
       {/* Table */}
@@ -117,18 +158,22 @@ export function AdminFinance() {
         <table className="table">
           <thead>
             <tr>
-              <th>Учитель</th>
-              <th>Статус</th>
-              <th>Тариф</th>
-              <th>Сумма</th>
-              <th>До</th>
-              <th>Обновлено</th>
+              <th>{t('admin.fin.col.teacher')}</th>
+              <th>{t('admin.fin.col.status')}</th>
+              <th>{t('admin.fin.col.type')}</th>
+              <th>{t('admin.fin.col.amount')}</th>
+              <th>{t('admin.fin.col.source')}</th>
+              <th>{t('admin.fin.col.comment')}</th>
+              <th>{t('admin.fin.col.actor')}</th>
+              <th>{t('admin.fin.col.until')}</th>
+              <th>{t('admin.fin.col.updated')}</th>
             </tr>
           </thead>
           <tbody>
             {subs.map((s: any) => {
               const isExpired = s.status === 'EXPIRED' || (s.endDate && new Date(s.endDate) < new Date() && s.status === 'ACTIVE');
               const expSoon = s.status === 'ACTIVE' && s.endDate && +new Date(s.endDate) - Date.now() < 7 * 86400000;
+              const lastChange = s.history?.[0];
               return (
                 <tr key={s.id}>
                   <td>
@@ -138,6 +183,11 @@ export function AdminFinance() {
                   <td><StatusBadge status={s.status} /></td>
                   <td>{s.type || '—'}</td>
                   <td>{s.amount ? `${s.amount.toLocaleString()} ${s.currency || '₽'}` : '—'}</td>
+                  <td className="muted" style={{ fontSize: 12 }}>{s.source || '—'}</td>
+                  <td style={{ fontSize: 12, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.comment || ''}>
+                    {s.comment || '—'}
+                  </td>
+                  <td className="muted" style={{ fontSize: 12 }}>{lastChange?.actor?.fullName || '—'}</td>
                   <td style={{ color: isExpired ? 'var(--danger)' : expSoon ? '#b45309' : undefined }}>
                     {s.endDate ? new Date(s.endDate).toLocaleDateString() : '—'}
                   </td>
@@ -146,7 +196,7 @@ export function AdminFinance() {
               );
             })}
             {subs.length === 0 && (
-              <tr><td colSpan={6} className="empty">{t('empty.noFound')}</td></tr>
+              <tr><td colSpan={9} className="empty">{t('empty.noFound')}</td></tr>
             )}
           </tbody>
         </table>
@@ -154,4 +204,3 @@ export function AdminFinance() {
     </Shell>
   );
 }
-

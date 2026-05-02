@@ -458,12 +458,81 @@ export class AdminService {
     return c;
   }
 
+  /** Toggle the hidden flag (independent of archive). Hidden courses don't show in catalog/learners. */
+  async toggleCourseHidden(actorId: string, courseId: string) {
+    const cur = await this.prisma.course.findUnique({ where: { id: courseId }, select: { hidden: true } });
+    if (!cur) throw new NotFoundException();
+    const c = await this.prisma.course.update({ where: { id: courseId }, data: { hidden: !cur.hidden } });
+    this.audit.log(actorId, 'course.hidden', { targetType: 'Course', targetId: courseId, meta: { hidden: c.hidden } });
+    return c;
+  }
+
+  /**
+   * Deep-copy a course (modules + lessons + blocks). Accesses, groups, and
+   * student progress are NOT copied — the duplicate starts fresh as a DRAFT.
+   */
+  async duplicateCourse(actorId: string, courseId: string) {
+    const src = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      include: { modules: { include: { lessons: { include: { blocks: true } } } } },
+    });
+    if (!src) throw new NotFoundException();
+    const copy = await this.prisma.course.create({
+      data: {
+        teacherId: src.teacherId,
+        title: `${src.title} (копия)`,
+        description: src.description,
+        category: src.category,
+        price: src.price,
+        status: 'DRAFT',
+        hidden: false,
+        modules: {
+          create: src.modules.map((m: any) => ({
+            title: m.title,
+            position: m.position,
+            lessons: {
+              create: m.lessons.map((l: any) => ({
+                title: l.title,
+                position: l.position,
+                isHomework: l.isHomework,
+                deadlineMode: l.deadlineMode,
+                deadlineAt: l.deadlineAt,
+                aiHelper: l.aiHelper,
+                blocks: {
+                  create: l.blocks.map((b: any) => ({
+                    type: b.type,
+                    position: b.position,
+                    isHomework: b.isHomework,
+                    videoUrls: b.videoUrls,
+                    textTitle: b.textTitle,
+                    textBody: b.textBody,
+                    miniQuizQuestion: b.miniQuizQuestion,
+                    miniQuizAnswer: b.miniQuizAnswer,
+                    fileUrls: b.fileUrls,
+                    writtenPrompt: b.writtenPrompt,
+                    writtenHint: b.writtenHint,
+                    quizKind: b.quizKind,
+                    quizPayload: b.quizPayload as any,
+                    quizCorrect: b.quizCorrect as any,
+                  })),
+                },
+              })),
+            },
+          })),
+        },
+      },
+    });
+    this.audit.log(actorId, 'course.duplicate', { targetType: 'Course', targetId: copy.id, meta: { sourceId: src.id } });
+    return copy;
+  }
+
   // ============================================================
   // Finance
   // ============================================================
-  async finance(opts: { search?: string; status?: string; period?: string } = {}) {
+  async finance(opts: { search?: string; status?: string; period?: string; source?: string; managerId?: string } = {}) {
     const where: any = {};
     if (opts.status && opts.status !== 'all') where.status = opts.status;
+    if (opts.source && opts.source !== 'all') where.source = opts.source;
     const search = opts.search?.trim();
     if (search) {
       where.teacher = {
@@ -474,9 +543,21 @@ export class AdminService {
         ],
       };
     }
+    // If filtering by manager, only return subs whose latest history entry is by this manager.
+    if (opts.managerId && opts.managerId !== 'all') {
+      const latest = await this.prisma.subscriptionHistory.findMany({
+        where: { actorId: opts.managerId },
+        select: { subscriptionId: true },
+        distinct: ['subscriptionId'],
+      });
+      where.id = { in: latest.map((h) => h.subscriptionId) };
+    }
     const subs = await this.prisma.subscription.findMany({
       where,
-      include: { teacher: { select: { id: true, fullName: true, login: true, email: true, archived: true } } },
+      include: {
+        teacher: { select: { id: true, fullName: true, login: true, email: true, archived: true } },
+        history: { orderBy: { createdAt: 'desc' }, take: 1, include: { actor: { select: { id: true, fullName: true, login: true } } } },
+      },
       orderBy: { updatedAt: 'desc' },
     });
 

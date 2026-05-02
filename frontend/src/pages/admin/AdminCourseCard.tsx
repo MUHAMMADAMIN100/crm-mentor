@@ -1,4 +1,4 @@
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Shell } from '../../components/Shell';
 import { Loading } from '../../components/Loading';
 import { useApi } from '../../hooks';
@@ -10,6 +10,7 @@ import { Kpi, StatusBadge } from '../../components/AdminUI';
 export function AdminCourseCard() {
   const { t } = useT();
   const { id } = useParams();
+  const nav = useNavigate();
   const { data, refetch } = useApi<any>(`/admin/courses/${id}`);
 
   if (!data) return <Shell title={t('admin.course.cardTitle')}><Loading label={t('loader.course')} /></Shell>;
@@ -27,6 +28,22 @@ export function AdminCourseCard() {
       toast.success(t('admin.system.saved'));
     } catch { toast.error(t('toast.error')); }
   }
+  async function toggleHidden() {
+    try {
+      await api.patch(`/admin/courses/${c.id}/hidden`);
+      invalidateApi('/admin/courses');
+      refetch();
+      toast.success(t('admin.system.saved'));
+    } catch { toast.error(t('toast.error')); }
+  }
+  async function duplicate() {
+    try {
+      const r = await api.post(`/admin/courses/${c.id}/duplicate`);
+      invalidateApi('/admin/courses');
+      toast.success(t('admin.course.duplicated'));
+      nav(`/admin/courses/${r.data.id}`);
+    } catch { toast.error(t('toast.error')); }
+  }
 
   const totalLessons = (c.modules || []).reduce((s: number, m: any) => s + (m.lessons?.length || 0), 0);
   const totalBlocks = (c.modules || []).reduce(
@@ -40,6 +57,9 @@ export function AdminCourseCard() {
         <Link to="/admin/courses" className="btn btn-sm">← {t('btn.back')}</Link>
         <div className="spacer" />
         <StatusBadge status={c.status} />
+        {c.hidden && <span className="status-badge status-muted">{t('admin.course.hidden')}</span>}
+        <button className="btn btn-sm" onClick={duplicate}>{t('admin.course.duplicate')}</button>
+        <button className="btn btn-sm" onClick={toggleHidden}>{c.hidden ? t('admin.course.show') : t('admin.course.hide')}</button>
         {c.status !== 'PUBLISHED_PRIVATE' && <button className="btn btn-sm" onClick={() => setStatus('PUBLISHED_PRIVATE')}>{t('admin.course.publish')}</button>}
         {c.status !== 'DRAFT' && <button className="btn btn-sm" onClick={() => setStatus('DRAFT')}>{t('admin.course.toDraft')}</button>}
         {c.status !== 'ARCHIVED' && <button className="btn btn-sm btn-danger" onClick={() => setStatus('ARCHIVED')}>{t('btn.archive')}</button>}
