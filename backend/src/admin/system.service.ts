@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuthService } from '../auth/auth.service';
 import { AuditService } from './audit.service';
 
 const DEFAULT_SETTINGS: Record<string, string> = {
@@ -13,6 +14,20 @@ const DEFAULT_SETTINGS: Record<string, string> = {
   'feature.marketplace': 'false',
   'feature.schools': 'false',
   'feature.managers': 'true',
+  // Reference dictionaries (JSON arrays serialised as strings).
+  'ref.subscriptionStatuses': JSON.stringify(['TRIAL', 'ACTIVE', 'EXPIRED', 'BLOCKED', 'PAUSED', 'CANCELED']),
+  'ref.subscriptionTypes': JSON.stringify(['MONTH', 'YEAR']),
+  'ref.teacherCategories': JSON.stringify(['math', 'english', 'physics', 'chemistry', 'music', 'programming', 'design', 'business']),
+  'ref.studentTags': JSON.stringify(['vip', 'new', 'inactive', 'problem', 'champion']),
+  'ref.paymentSources': JSON.stringify(['manual_admin', 'card', 'invoice', 'crypto', 'cash', 'transfer']),
+  // Security settings
+  'security.minPasswordLength': '6',
+  'security.lockoutOnFailedAttempts': 'false',
+  'security.maxFailedAttempts': '5',
+  'security.requireTwoFactorForAdmin': 'false',
+  'security.passwordRotationDays': '0',
+  // Bumped on "force logout all" — JWTs issued before this timestamp are rejected.
+  'security.jwtEpoch': '0',
 };
 
 const DEFAULT_TEMPLATES = [
@@ -75,5 +90,51 @@ export class SystemService {
     });
     this.audit.log(actorId, 'system.template', { targetType: 'NotificationTemplate', targetId: id });
     return t;
+  }
+
+  // ============================================================
+  // Security operations
+  // ============================================================
+
+  /**
+   * Force-logout all non-admin users by bumping the JWT epoch. Existing
+   * tokens issued before this timestamp will be rejected by the JWT guard.
+   */
+  async forceLogoutAll(actorId: string) {
+    const epoch = String(Date.now());
+    await this.prisma.systemSetting.upsert({
+      where: { key: 'security.jwtEpoch' },
+      update: { value: epoch },
+      create: { key: 'security.jwtEpoch', value: epoch },
+    });
+    this.audit.log(actorId, 'security.forceLogoutAll', { meta: { epoch } });
+    return { ok: true, epoch };
+  }
+
+  /**
+   * Require all teachers to set a new password on next login. Sets
+   * mustChangePassword=true on every TEACHER row.
+   */
+  async resetAllTeacherPasswords(actorId: string) {
+    const r = await this.prisma.user.updateMany({ where: { role: 'TEACHER', archived: false }, data: { mustChangePassword: true } });
+    this.audit.log(actorId, 'security.resetAllTeacherPasswords', { meta: { count: r.count } });
+    return { ok: true, count: r.count };
+  }
+
+  /**
+   * Set a fresh password for a specific user (used by support to help
+   * a stuck user). Stores plainPassword for the actor's reference.
+   */
+  async setUserPassword(actorId: string, userId: string, password: string) {
+    if (!password || password.length < 6) throw new BadRequestException('Минимум 6 символов');
+    const u = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!u) throw new NotFoundException();
+    const hash = await AuthService.hashPassword(password);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { password: hash, plainPassword: password, mustChangePassword: false },
+    });
+    this.audit.log(actorId, 'security.setUserPassword', { targetType: 'User', targetId: userId });
+    return { ok: true };
   }
 }

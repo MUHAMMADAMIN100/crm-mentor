@@ -115,6 +115,11 @@ export class AdminController {
   @Patch('system/templates/:id') updateTemplate(@CurrentUser() u, @Param('id') id: string, @Body() body: any) {
     return this.system.updateTemplate(u.id, id, body);
   }
+  @Post('system/security/force-logout-all') forceLogoutAll(@CurrentUser() u) { return this.system.forceLogoutAll(u.id); }
+  @Post('system/security/reset-teacher-passwords') resetTeacherPasswords(@CurrentUser() u) { return this.system.resetAllTeacherPasswords(u.id); }
+  @Post('system/security/set-user-password') setUserPassword(@CurrentUser() u, @Body() body: { userId: string; password: string }) {
+    return this.system.setUserPassword(u.id, body.userId, body.password);
+  }
 
   // ----- Audit log -----
   @Get('audit') auditList(@Query() q: any) {
