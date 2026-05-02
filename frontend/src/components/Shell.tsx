@@ -3,6 +3,8 @@ import { useAuth } from '../store';
 import { useState, ReactNode, useEffect, useRef } from 'react';
 import { prefetch } from '../api';
 import { useT, useI18n, LANG_OPTIONS, Lang } from '../i18n';
+import { GlobalSearch } from './GlobalSearch';
+import { AdminBell } from './AdminBell';
 
 const PREFETCH_MAP: Record<string, () => void> = {
   '/admin':            () => prefetch('/admin/analytics'),
@@ -150,6 +152,7 @@ export function Shell({ title, children, showBack }: { title: string; children: 
 
   return (
     <div className="app-shell">
+      {user.role === 'ADMIN' && <GlobalSearch />}
       {sidebarOpen && <div className="sidebar-backdrop open" onClick={() => setSidebarOpen(false)} />}
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="logo">Miz</div>
@@ -188,6 +191,7 @@ export function Shell({ title, children, showBack }: { title: string; children: 
             <div className="title">{title}</div>
           </div>
           <div className="right">
+            {user.role === 'ADMIN' && <AdminBell />}
             <LangPicker lang={lang} setLang={setLang} />
             <span className="muted user-name-label" style={{ fontSize: 13 }}>{user.fullName}</span>
             <div ref={menuRef} style={{ position: 'relative' }}>

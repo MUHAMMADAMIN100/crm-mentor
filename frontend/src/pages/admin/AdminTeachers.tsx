@@ -7,7 +7,7 @@ import { Modal } from '../../components/Modal';
 import { SkeletonTable } from '../../components/Skeleton';
 import { toast } from '../../store';
 import { useT } from '../../i18n';
-import { StatusBadge, BulkBar, SortHeader } from '../../components/AdminUI';
+import { StatusBadge, BulkBar, SortHeader, Paginator } from '../../components/AdminUI';
 import { ArchiveReasonModal } from '../../components/ArchiveReasonModal';
 
 export function AdminTeachers() {
@@ -19,6 +19,8 @@ export function AdminTeachers() {
   const [hasStudents, setHasStudents] = useState('any');
   const [hasCourses, setHasCourses] = useState('any');
   const [sort, setSort] = useState('-created');
+  const [offset, setOffset] = useState(0);
+  const limit = 50;
 
   const url = `/admin/teachers?${new URLSearchParams({
     ...(search ? { search } : {}),
@@ -28,8 +30,12 @@ export function AdminTeachers() {
     ...(hasStudents !== 'any' ? { hasStudents } : {}),
     ...(hasCourses !== 'any' ? { hasCourses } : {}),
     ...(sort ? { sort } : {}),
+    limit: String(limit),
+    offset: String(offset),
   }).toString()}`;
-  const { data: list, loading, refetch } = useApi<any[]>(url);
+  const { data: response, loading, refetch } = useApi<any>(url);
+  const list: any[] = response?.items || [];
+  const total: number = response?.total || 0;
 
   const [createOpen, setCreateOpen] = useState(false);
   const [subOpen, setSubOpen] = useState<any>(null);
@@ -114,8 +120,8 @@ export function AdminTeachers() {
     URL.revokeObjectURL(a.href);
   }
 
-  const sortedList = list || [];
-  const allSelected = list && list.length > 0 && selected.size === list.length;
+  const sortedList = list;
+  const allSelected = list.length > 0 && selected.size === list.length;
 
   return (
     <Shell title={t('nav.teachers')}>
@@ -208,6 +214,7 @@ export function AdminTeachers() {
               {sortedList.length === 0 && <tr><td colSpan={9} className="empty">{t('empty.noFound')}</td></tr>}
             </tbody>
           </table>
+          <Paginator total={total} limit={limit} offset={offset} onChange={setOffset} />
         </div>
       )}
 

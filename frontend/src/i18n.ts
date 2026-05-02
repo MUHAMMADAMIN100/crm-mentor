@@ -328,6 +328,17 @@ const ru = {
   'admin.system.confirmResetPwdTitle': 'Сбросить пароли всех учителей?',
   'admin.system.confirmResetPwdBody': 'Все учителя будут вынуждены задать новый пароль при следующем входе.',
 
+  'admin.search.placeholder': 'Поиск по учителям, ученикам, курсам, менеджерам…',
+  'admin.search.hint': 'Начните вводить — глобальный поиск по всей админке',
+  'admin.search.empty': 'Ничего не найдено',
+
+  'admin.bell.expiring': 'Подписки истекают',
+  'admin.bell.expired': 'Просроченные подписки',
+  'admin.bell.newTeachers': 'Новые учителя за 24ч',
+  'admin.bell.newStudents': 'Новые ученики за 24ч',
+  'admin.bell.recentPayments': 'Последние оплаты',
+  'admin.bell.empty': 'Все спокойно',
+
   // Topbar / profile menu
   'menu.profile': 'Профиль',
   'menu.settings': 'Настройки',
@@ -1233,6 +1244,17 @@ const en: typeof ru = {
   'admin.system.confirmResetPwdTitle': 'Reset all teacher passwords?',
   'admin.system.confirmResetPwdBody': 'All teachers will be required to set a new password on next login.',
 
+  'admin.search.placeholder': 'Search teachers, students, courses, managers…',
+  'admin.search.hint': 'Start typing — global search across the admin panel',
+  'admin.search.empty': 'Nothing found',
+
+  'admin.bell.expiring': 'Subscriptions expiring',
+  'admin.bell.expired': 'Expired subscriptions',
+  'admin.bell.newTeachers': 'New teachers in 24h',
+  'admin.bell.newStudents': 'New students in 24h',
+  'admin.bell.recentPayments': 'Recent payments',
+  'admin.bell.empty': 'All quiet',
+
   'menu.profile': 'Profile',
   'menu.settings': 'Settings',
   'menu.logout': 'Log out',
@@ -2105,6 +2127,17 @@ const tr: typeof ru = {
   'admin.system.resetPwdDone': 'Şifre değişimi için işaretlenen öğretmen',
   'admin.system.confirmResetPwdTitle': 'Tüm öğretmen şifreleri sıfırlansın mı?',
   'admin.system.confirmResetPwdBody': 'Tüm öğretmenler bir sonraki girişte yeni şifre belirlemek zorunda kalır.',
+
+  'admin.search.placeholder': 'Öğretmen, öğrenci, kurs, yönetici ara…',
+  'admin.search.hint': 'Yazmaya başlayın — admin panelinde global arama',
+  'admin.search.empty': 'Bir şey bulunamadı',
+
+  'admin.bell.expiring': 'Süresi dolan abonelikler',
+  'admin.bell.expired': 'Süresi dolmuş abonelikler',
+  'admin.bell.newTeachers': '24s yeni öğretmenler',
+  'admin.bell.newStudents': '24s yeni öğrenciler',
+  'admin.bell.recentPayments': 'Son ödemeler',
+  'admin.bell.empty': 'Her şey sakin',
 
   'menu.profile': 'Profil',
   'menu.settings': 'Ayarlar',

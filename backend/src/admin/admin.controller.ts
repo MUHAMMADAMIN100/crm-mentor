@@ -121,6 +121,10 @@ export class AdminController {
     return this.system.setUserPassword(u.id, body.userId, body.password);
   }
 
+  // ----- Global search + admin bell -----
+  @Get('search') search(@Query('q') q: string) { return this.svc.globalSearch(q || ''); }
+  @Get('notifications') notifications() { return this.svc.adminNotifications(); }
+
   // ----- Audit log -----
   @Get('audit') auditList(@Query() q: any) {
     return this.audit.list(+(q.limit || 100), +(q.offset || 0), { actorId: q.actorId, action: q.action, targetId: q.targetId });

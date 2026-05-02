@@ -115,6 +115,27 @@ export function BulkBar({
 }
 
 /**
+ * Server-side pagination control. Pass `total`, `limit`, `offset` and the
+ * setter; renders «← Prev | page X of Y | Next →» with item count.
+ */
+export function Paginator({
+  total, limit, offset, onChange,
+}: { total: number; limit: number; offset: number; onChange: (offset: number) => void }) {
+  if (total <= limit) return null;
+  const page = Math.floor(offset / limit) + 1;
+  const pages = Math.max(1, Math.ceil(total / limit));
+  const prev = () => onChange(Math.max(0, offset - limit));
+  const next = () => onChange(Math.min((pages - 1) * limit, offset + limit));
+  return (
+    <div className="paginator">
+      <button className="btn btn-sm" onClick={prev} disabled={page === 1}>← Назад</button>
+      <span className="muted" style={{ fontSize: 13 }}>Стр. <strong>{page}</strong> из {pages} · всего {total}</span>
+      <button className="btn btn-sm" onClick={next} disabled={page === pages}>Вперёд →</button>
+    </div>
+  );
+}
+
+/**
  * Clickable column header that toggles sort direction.
  * Pass `sort` (current sort key) and `onSort` (set new sort key).
  * Convention: passing the same key flips direction (asc/desc).

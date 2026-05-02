@@ -6,7 +6,7 @@ import { useApi } from '../../hooks';
 import { SkeletonTable } from '../../components/Skeleton';
 import { toast } from '../../store';
 import { useT } from '../../i18n';
-import { StatusBadge, BulkBar, SortHeader } from '../../components/AdminUI';
+import { StatusBadge, BulkBar, SortHeader, Paginator } from '../../components/AdminUI';
 import { ArchiveReasonModal } from '../../components/ArchiveReasonModal';
 
 export function AdminStudents() {
@@ -16,6 +16,8 @@ export function AdminStudents() {
   const [activity, setActivity] = useState('any');
   const [tag, setTag] = useState('');
   const [sort, setSort] = useState('-created');
+  const [offset, setOffset] = useState(0);
+  const limit = 50;
 
   const url = `/admin/students?${new URLSearchParams({
     ...(search ? { search } : {}),
@@ -23,8 +25,12 @@ export function AdminStudents() {
     ...(activity !== 'any' ? { activity } : {}),
     ...(tag ? { tag } : {}),
     ...(sort ? { sort } : {}),
+    limit: String(limit),
+    offset: String(offset),
   }).toString()}`;
-  const { data: list, loading, refetch } = useApi<any[]>(url);
+  const { data: response, loading, refetch } = useApi<any>(url);
+  const list: any[] = response?.items || [];
+  const total: number = response?.total || 0;
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [archiveTarget, setArchiveTarget] = useState<any>(null);
@@ -103,8 +109,8 @@ export function AdminStudents() {
     URL.revokeObjectURL(a.href);
   }
 
-  const sortedList = list || [];
-  const allSelected = list && list.length > 0 && selected.size === list.length;
+  const sortedList = list;
+  const allSelected = list.length > 0 && selected.size === list.length;
 
   return (
     <Shell title={t('nav.students')}>
@@ -184,6 +190,7 @@ export function AdminStudents() {
               {sortedList.length === 0 && <tr><td colSpan={7} className="empty">{t('empty.noFound')}</td></tr>}
             </tbody>
           </table>
+          <Paginator total={total} limit={limit} offset={offset} onChange={setOffset} />
         </div>
       )}
 

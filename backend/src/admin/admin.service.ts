@@ -174,6 +174,106 @@ export class AdminService {
   }
 
   // ============================================================
+  // Global search (Cmd+K)
+  // ============================================================
+  async globalSearch(query: string) {
+    const q = query.trim();
+    if (!q) return { teachers: [], students: [], courses: [], managers: [] };
+
+    const matchTextUser: any = {
+      OR: [
+        { fullName: { contains: q, mode: 'insensitive' } },
+        { login: { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } },
+        { phone: { contains: q } },
+      ],
+    };
+
+    const [teachers, students, courses, managers] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { role: 'TEACHER', ...matchTextUser },
+        select: { id: true, fullName: true, login: true, email: true, archived: true },
+        take: 8,
+      }),
+      this.prisma.user.findMany({
+        where: { role: 'STUDENT', ...matchTextUser },
+        select: { id: true, fullName: true, login: true, email: true, archived: true },
+        take: 8,
+      }),
+      this.prisma.course.findMany({
+        where: {
+          OR: [
+            { title: { contains: q, mode: 'insensitive' } },
+            { category: { contains: q, mode: 'insensitive' } },
+            { teacher: { fullName: { contains: q, mode: 'insensitive' } } },
+          ],
+        },
+        select: { id: true, title: true, status: true, teacher: { select: { id: true, fullName: true } } },
+        take: 8,
+      }),
+      this.prisma.user.findMany({
+        where: { role: 'ADMIN', ...matchTextUser },
+        select: { id: true, fullName: true, login: true, adminLevel: true },
+        take: 5,
+      }),
+    ]);
+    return { teachers, students, courses, managers };
+  }
+
+  // ============================================================
+  // Bell notifications for admin (computed live)
+  // ============================================================
+  async adminNotifications() {
+    const now = new Date();
+    const in7d = new Date(now.getTime() + 7 * 86400000);
+    const ago7d = new Date(now.getTime() - 7 * 86400000);
+    const ago24h = new Date(now.getTime() - 86400000);
+
+    const [expiringSoon, expired, newTeachers24h, newStudents24h, recentPayments] = await Promise.all([
+      this.prisma.subscription.findMany({
+        where: { status: 'ACTIVE', endDate: { gte: now, lte: in7d } },
+        include: { teacher: { select: { id: true, fullName: true, login: true } } },
+        orderBy: { endDate: 'asc' },
+        take: 20,
+      }),
+      this.prisma.subscription.findMany({
+        where: { OR: [{ status: 'EXPIRED' }, { AND: [{ status: 'ACTIVE' }, { endDate: { lt: now } }] }] },
+        include: { teacher: { select: { id: true, fullName: true, login: true } } },
+        orderBy: { endDate: 'asc' },
+        take: 20,
+      }),
+      this.prisma.user.findMany({
+        where: { role: 'TEACHER', createdAt: { gte: ago24h } },
+        select: { id: true, fullName: true, login: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.user.findMany({
+        where: { role: 'STUDENT', createdAt: { gte: ago24h } },
+        select: { id: true, fullName: true, login: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.subscriptionHistory.findMany({
+        where: { createdAt: { gte: ago7d }, action: { in: ['extend', 'create'] } },
+        include: {
+          subscription: { include: { teacher: { select: { id: true, fullName: true, login: true } } } },
+          actor: { select: { id: true, fullName: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      }),
+    ]);
+
+    return {
+      total: expiringSoon.length + expired.length + newTeachers24h.length + newStudents24h.length,
+      expiringSoon,
+      expired,
+      newTeachers24h,
+      newStudents24h,
+      recentPayments,
+    };
+  }
+
+  // ============================================================
   // Subscriptions
   // ============================================================
   async updateSubscription(actorId: string, teacherId: string, data: any) {
