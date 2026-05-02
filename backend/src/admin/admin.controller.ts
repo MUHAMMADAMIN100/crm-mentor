@@ -59,6 +59,12 @@ export class AdminController {
   @Post('users/bulk-archive') bulkArchive(@CurrentUser() u, @Body() body: { ids: string[]; reason?: string }) {
     return this.svc.bulkArchive(u.id, body.ids || [], body.reason);
   }
+  @Post('teachers/bulk-import') bulkImportTeachers(@CurrentUser() u, @Body() body: { rows: any[] }) {
+    return this.svc.bulkImportTeachers(u.id, body.rows || []);
+  }
+  @Post('students/bulk-import') bulkImportStudents(@CurrentUser() u, @Body() body: { teacherId: string; rows: any[] }) {
+    return this.svc.bulkImportStudents(u.id, body.teacherId, body.rows || []);
+  }
 
   // ----- Students -----
   @Get('students') students(@Query() q: any) {

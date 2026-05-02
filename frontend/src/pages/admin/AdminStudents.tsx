@@ -8,6 +8,7 @@ import { toast } from '../../store';
 import { useT } from '../../i18n';
 import { StatusBadge, BulkBar, SortHeader, Paginator } from '../../components/AdminUI';
 import { ArchiveReasonModal } from '../../components/ArchiveReasonModal';
+import { ImportModal } from '../../components/ImportModal';
 
 export function AdminStudents() {
   const { t } = useT();
@@ -31,8 +32,12 @@ export function AdminStudents() {
   const { data: response, loading, refetch } = useApi<any>(url);
   const list: any[] = response?.items || [];
   const total: number = response?.total || 0;
+  const { data: teachers } = useApi<any[]>('/admin/teachers');
+  const teachersList: any[] = Array.isArray(teachers) ? teachers : (teachers as any)?.items || [];
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [importOpen, setImportOpen] = useState(false);
+  const [importTeacherId, setImportTeacherId] = useState('');
   const [archiveTarget, setArchiveTarget] = useState<any>(null);
   const [bulkArchiveOpen, setBulkArchiveOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
@@ -137,6 +142,7 @@ export function AdminStudents() {
         </select>
         <div className="spacer" />
         <button className="btn" onClick={exportSelected}>⬇ CSV</button>
+        <button className="btn" onClick={() => setImportOpen(true)}>⬆ {t('admin.import.import')}</button>
       </div>
 
       {!list && loading ? <SkeletonTable rows={6} cols={6} /> : (
@@ -222,6 +228,31 @@ export function AdminStudents() {
         onConfirm={bulkArchive}
       />
 
+      <ImportModal
+        open={importOpen}
+        onClose={() => { setImportOpen(false); refetch(); }}
+        title={t('admin.import.studentsTitle')}
+        requiredFields={['fullName', 'login', 'password']}
+        optionalFields={['email', 'phone', 'telegram', 'individualPrice']}
+        extraPayload={
+          <div className="field">
+            <label>{t('admin.import.assignTeacher')}</label>
+            <select className="select" value={importTeacherId} onChange={(e) => setImportTeacherId(e.target.value)}>
+              <option value="">— {t('btn.choose')} —</option>
+              {teachersList.map((tt: any) => <option key={tt.id} value={tt.id}>{tt.fullName} ({tt.login})</option>)}
+            </select>
+          </div>
+        }
+        onImport={async (rows) => {
+          if (!importTeacherId) {
+            toast.warning(t('admin.import.selectTeacherFirst'));
+            throw new Error('teacher missing');
+          }
+          const r = await api.post('/admin/students/bulk-import', { teacherId: importTeacherId, rows });
+          invalidateApi('/admin/students');
+          return r.data;
+        }}
+      />
       <BulkBar count={selected.size} onClear={() => setSelected(new Set())}>
         <button className="btn btn-danger" onClick={() => setBulkArchiveOpen(true)}>{t('btn.archive')}</button>
         <button className="btn" onClick={exportSelected}>⬇ CSV</button>

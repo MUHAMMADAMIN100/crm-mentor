@@ -9,6 +9,7 @@ import { toast } from '../../store';
 import { useT } from '../../i18n';
 import { StatusBadge, BulkBar, SortHeader, Paginator } from '../../components/AdminUI';
 import { ArchiveReasonModal } from '../../components/ArchiveReasonModal';
+import { ImportModal } from '../../components/ImportModal';
 
 export function AdminTeachers() {
   const { t } = useT();
@@ -38,6 +39,7 @@ export function AdminTeachers() {
   const total: number = response?.total || 0;
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [subOpen, setSubOpen] = useState<any>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [archiveTarget, setArchiveTarget] = useState<any>(null);
@@ -159,6 +161,7 @@ export function AdminTeachers() {
         </select>
         <div className="spacer" />
         <button className="btn" onClick={exportSelected}>⬇ CSV</button>
+        <button className="btn" onClick={() => setImportOpen(true)}>⬆ {t('admin.import.import')}</button>
         <button className="btn btn-primary" onClick={() => setCreateOpen(true)}>{t('btn.addTeacher')}</button>
       </div>
 
@@ -219,6 +222,19 @@ export function AdminTeachers() {
       )}
 
       {createOpen && <CreateTeacherModal onClose={() => setCreateOpen(false)} onSaved={refetch} />}
+      <ImportModal
+        open={importOpen}
+        onClose={() => { setImportOpen(false); refetch(); }}
+        title={t('admin.import.teachersTitle')}
+        requiredFields={['fullName', 'login', 'password']}
+        optionalFields={['email', 'phone']}
+        onImport={async (rows) => {
+          const r = await api.post('/admin/teachers/bulk-import', { rows });
+          invalidateApi('/admin/teachers');
+          return r.data;
+        }}
+      />
+
       {subOpen && <SubscriptionModal teacher={subOpen} onClose={() => { setSubOpen(null); refetch(); }} />}
 
       <ArchiveReasonModal

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Shell } from '../../components/Shell';
 import { useApi } from '../../hooks';
 import { api, mutateCache, invalidateApi } from '../../api';
@@ -61,22 +61,7 @@ export function AdminManagers() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((m) => (
-                <tr key={m.id}>
-                  <td>
-                    <div style={{ fontWeight: 500 }}>{m.fullName}</div>
-                    {m.email && <div className="muted" style={{ fontSize: 11 }}>{m.email}</div>}
-                  </td>
-                  <td>{m.login}</td>
-                  <td>{m.adminLevel ? <StatusBadge status={m.adminLevel} /> : '—'}</td>
-                  <td className="muted" style={{ fontSize: 11 }}>{m.permissions ? m.permissions.split(',').slice(0, 4).join(', ') + (m.permissions.split(',').length > 4 ? '…' : '') : '—'}</td>
-                  <td className="muted" style={{ fontSize: 11 }}>{m.lastLoginAt ? new Date(m.lastLoginAt).toLocaleString() : '—'}</td>
-                  <td className="admin-row-actions">
-                    <button className="btn btn-sm" onClick={() => { setEditing(m); setOpen(true); }}>{t('btn.edit')}</button>
-                    <button className="btn btn-sm btn-ghost" onClick={() => archive(m.id)}>{t('btn.archive')}</button>
-                  </td>
-                </tr>
-              ))}
+              {filtered.map((m) => <ManagerRow key={m.id} m={m} t={t} onEdit={() => { setEditing(m); setOpen(true); }} onArchive={() => archive(m.id)} />)}
               {filtered.length === 0 && <tr><td colSpan={6} className="empty">{t('admin.managers.empty')}</td></tr>}
             </tbody>
           </table>
@@ -85,6 +70,62 @@ export function AdminManagers() {
 
       {open && <ManagerForm initial={editing} permissions={perms || []} onClose={() => setOpen(false)} onSaved={refetch} />}
     </Shell>
+  );
+}
+
+function ManagerRow({ m, t, onEdit, onArchive }: any) {
+  const [open, setOpen] = useState(false);
+  const [stats, setStats] = useState<any>(null);
+  useEffect(() => {
+    if (open && !stats) {
+      api.get(`/admin/managers/${m.id}/stats`).then((r) => setStats(r.data)).catch(() => {});
+    }
+  }, [open, stats, m.id]);
+  return (
+    <>
+      <tr>
+        <td>
+          <button onClick={() => setOpen((v) => !v)} aria-label="expand"
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', marginRight: 6, fontSize: 14 }}>
+            {open ? '▾' : '▸'}
+          </button>
+          <span style={{ fontWeight: 500 }}>{m.fullName}</span>
+          {m.email && <div className="muted" style={{ fontSize: 11, marginLeft: 22 }}>{m.email}</div>}
+        </td>
+        <td>{m.login}</td>
+        <td>{m.adminLevel ? <StatusBadge status={m.adminLevel} /> : '—'}</td>
+        <td className="muted" style={{ fontSize: 11 }}>{m.permissions ? m.permissions.split(',').slice(0, 4).join(', ') + (m.permissions.split(',').length > 4 ? '…' : '') : '—'}</td>
+        <td className="muted" style={{ fontSize: 11 }}>{m.lastLoginAt ? new Date(m.lastLoginAt).toLocaleString() : '—'}</td>
+        <td className="admin-row-actions">
+          <button className="btn btn-sm" onClick={onEdit}>{t('btn.edit')}</button>
+          <button className="btn btn-sm btn-ghost" onClick={onArchive}>{t('btn.archive')}</button>
+        </td>
+      </tr>
+      {open && (
+        <tr>
+          <td colSpan={6} style={{ background: 'var(--surface-2)', padding: 14 }}>
+            {!stats ? <span className="muted" style={{ fontSize: 12 }}>{t('status.loading')}</span> : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18 }}>
+                <StatBlock label={t('admin.managers.statTotal')} value={stats.total} />
+                <StatBlock label={t('admin.managers.statCreates')} value={stats.creates} />
+                <StatBlock label={t('admin.managers.statEdits')} value={stats.edits} />
+                <StatBlock label={t('admin.managers.statArchives')} value={stats.archives} />
+                <StatBlock label={t('admin.managers.statSubs')} value={stats.subs} />
+              </div>
+            )}
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+function StatBlock({ label, value }: { label: string; value: any }) {
+  return (
+    <div>
+      <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--primary)' }}>{value ?? 0}</div>
+    </div>
   );
 }
 

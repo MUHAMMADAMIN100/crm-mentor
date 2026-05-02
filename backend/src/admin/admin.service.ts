@@ -74,6 +74,91 @@ export class AdminService {
     return items;
   }
 
+  /**
+   * Bulk-import teachers from a parsed array. Each row needs at minimum
+   * fullName + login + password. Returns counts of created vs skipped.
+   */
+  async bulkImportTeachers(actorId: string, rows: any[]) {
+    let created = 0;
+    let skipped = 0;
+    const errors: string[] = [];
+    for (const row of rows) {
+      try {
+        if (!row?.fullName?.trim() || !row?.login?.trim() || !row?.password) {
+          skipped++; errors.push(`${row?.fullName || row?.login || '?'}: пропущены обязательные поля`);
+          continue;
+        }
+        if (String(row.password).length < 6) { skipped++; errors.push(`${row.login}: пароль короче 6 символов`); continue; }
+        const exists = await this.prisma.user.findUnique({ where: { login: row.login.trim() } });
+        if (exists) { skipped++; errors.push(`${row.login}: логин занят`); continue; }
+        await this.createTeacher(actorId, {
+          fullName: row.fullName.trim(),
+          login: row.login.trim(),
+          password: String(row.password),
+          email: row.email || undefined,
+          phone: row.phone || undefined,
+        });
+        created++;
+      } catch (e: any) {
+        skipped++;
+        errors.push(`${row?.login || '?'}: ${e?.message || 'ошибка'}`);
+      }
+    }
+    this.audit.log(actorId, 'bulk.importTeachers', { meta: { created, skipped } });
+    return { created, skipped, errors: errors.slice(0, 50) };
+  }
+
+  /**
+   * Bulk-import students for a specific teacher. Each row needs
+   * fullName + login + password. Other fields (email, phone, etc.) are
+   * optional. Returns counts of created vs skipped.
+   */
+  async bulkImportStudents(actorId: string, teacherId: string, rows: any[]) {
+    const teacher = await this.prisma.user.findUnique({ where: { id: teacherId }, select: { id: true, role: true } });
+    if (!teacher || teacher.role !== 'TEACHER') throw new BadRequestException('Учитель не найден');
+    let created = 0;
+    let skipped = 0;
+    const errors: string[] = [];
+    for (const row of rows) {
+      try {
+        if (!row?.fullName?.trim() || !row?.login?.trim() || !row?.password) {
+          skipped++; errors.push(`${row?.fullName || row?.login || '?'}: пропущены обязательные поля`); continue;
+        }
+        if (String(row.password).length < 6) { skipped++; errors.push(`${row.login}: пароль короче 6 символов`); continue; }
+        const exists = await this.prisma.user.findUnique({ where: { login: row.login.trim() } });
+        if (exists) { skipped++; errors.push(`${row.login}: логин занят`); continue; }
+        const hash = await AuthService.hashPassword(String(row.password));
+        await this.prisma.user.create({
+          data: {
+            login: row.login.trim(),
+            password: hash,
+            plainPassword: String(row.password),
+            role: 'STUDENT',
+            fullName: row.fullName.trim(),
+            email: row.email || null,
+            phone: row.phone || null,
+            telegram: row.telegram || null,
+            mustChangePassword: false,
+            profileCompleted: !!(row.email || row.phone || row.telegram),
+            studentProfile: {
+              create: {
+                teacherId,
+                individualPrice: row.individualPrice ? +row.individualPrice : null,
+                tree: { create: {} },
+              },
+            },
+          },
+        });
+        created++;
+      } catch (e: any) {
+        skipped++;
+        errors.push(`${row?.login || '?'}: ${e?.message || 'ошибка'}`);
+      }
+    }
+    this.audit.log(actorId, 'bulk.importStudents', { meta: { created, skipped, teacherId } });
+    return { created, skipped, errors: errors.slice(0, 50) };
+  }
+
   async createTeacher(actorId: string, data: { fullName: string; login: string; password: string; email?: string; phone?: string; subscription?: any }) {
     const exists = await this.prisma.user.findUnique({ where: { login: data.login } });
     if (exists) throw new BadRequestException('Логин уже занят');
