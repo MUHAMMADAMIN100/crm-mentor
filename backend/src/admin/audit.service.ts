@@ -27,18 +27,29 @@ export class AuditService {
   }
 
   /** List recent audit entries for the activity feed. */
-  async list(limit = 100, offset = 0, filter: { actorId?: string; action?: string; targetId?: string } = {}) {
-    return this.prisma.auditLog.findMany({
-      where: {
-        actorId: filter.actorId,
-        action: filter.action ? { contains: filter.action } : undefined,
-        targetId: filter.targetId,
-      },
-      include: { actor: { select: { id: true, fullName: true, login: true, role: true, adminLevel: true } } },
-      orderBy: { createdAt: 'desc' },
-      skip: offset,
-      take: Math.min(500, limit),
-    });
+  async list(limit = 100, offset = 0, filter: { actorId?: string; action?: string; targetId?: string; sort?: string } = {}) {
+    const sort = filter.sort || '';
+    const desc = sort.startsWith('-') || !sort;
+    const field = sort.replace(/^-/, '') || 'createdAt';
+    const orderBy: any = field === 'action' ? { action: desc ? 'desc' : 'asc' } : { createdAt: desc ? 'desc' : 'asc' };
+
+    const where = {
+      actorId: filter.actorId,
+      action: filter.action ? { contains: filter.action } : undefined,
+      targetId: filter.targetId,
+    };
+
+    const [items, total] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        where,
+        include: { actor: { select: { id: true, fullName: true, login: true, role: true, adminLevel: true } } },
+        orderBy,
+        skip: offset,
+        take: Math.min(500, limit),
+      }),
+      this.prisma.auditLog.count({ where }),
+    ]);
+    return { items, total };
   }
 
   count(filter: { actorId?: string; action?: string } = {}) {

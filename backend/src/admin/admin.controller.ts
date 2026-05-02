@@ -23,6 +23,7 @@ export class AdminController {
     return this.svc.listTeachers({
       search: q.search, status: q.status, archived: q.archived, sort: q.sort,
       activity: q.activity, hasStudents: q.hasStudents, hasCourses: q.hasCourses,
+      subType: q.subType, subEndFrom: q.subEndFrom, subEndTo: q.subEndTo,
       limit: q.limit, offset: q.offset,
     });
   }
@@ -83,11 +84,18 @@ export class AdminController {
 
   // ----- Courses -----
   @Get('courses') courses(@Query() q: any) {
-    return this.svc.listCourses({ search: q.search, status: q.status, teacherId: q.teacherId });
+    return this.svc.listCourses({
+      search: q.search, status: q.status, teacherId: q.teacherId, format: q.format,
+      sort: q.sort, limit: q.limit, offset: q.offset,
+    });
   }
   @Get('courses/:id') courseCard(@Param('id') id: string) { return this.svc.getCourseCard(id); }
+  @Get('courses/:id/progress') courseProgress(@Param('id') id: string) { return this.svc.courseProgress(id); }
   @Patch('courses/:id/status') setCourseStatus(@CurrentUser() u, @Param('id') id: string, @Body() body: { status: any }) {
     return this.svc.setCourseStatus(u.id, id, body.status);
+  }
+  @Patch('courses/:id/format') setCourseFormat(@CurrentUser() u, @Param('id') id: string, @Body() body: { format: string }) {
+    return this.svc.setCourseFormat(u.id, id, body.format);
   }
   @Patch('courses/:id/hidden') toggleCourseHidden(@CurrentUser() u, @Param('id') id: string) {
     return this.svc.toggleCourseHidden(u.id, id);
@@ -96,15 +104,28 @@ export class AdminController {
     return this.svc.duplicateCourse(u.id, id);
   }
 
+  // ----- Subscription mass actions -----
+  @Post('subscriptions/bulk-extend') bulkExtend(@CurrentUser() u, @Body() body: { teacherIds: string[]; months: number; comment?: string }) {
+    return this.svc.bulkExtendSubscriptions(u.id, body.teacherIds || [], +body.months, body.comment);
+  }
+  @Post('subscriptions/bulk-status') bulkSubStatus(@CurrentUser() u, @Body() body: { teacherIds: string[]; status: any; comment?: string }) {
+    return this.svc.bulkSetSubStatus(u.id, body.teacherIds || [], body.status, body.comment);
+  }
+
   // ----- Finance / Analytics / Dashboard -----
   @Get('finance') finance(@Query() q: any) {
-    return this.svc.finance({ search: q.search, status: q.status, period: q.period, source: q.source, managerId: q.managerId });
+    return this.svc.finance({
+      search: q.search, status: q.status, period: q.period, source: q.source, managerId: q.managerId,
+      subType: q.subType, sort: q.sort, limit: q.limit, offset: q.offset,
+    });
   }
   @Get('analytics') analytics(@Query() q: any) { return this.svc.analytics({ period: q.period, from: q.from, to: q.to }); }
   @Get('dashboard') dashboard() { return this.svc.dashboard(); }
 
   // ----- Managers -----
-  @Get('managers') listManagers() { return this.managers.list(); }
+  @Get('managers') listManagers(@Query() q: any) {
+    return this.managers.list({ search: q.search, sort: q.sort, limit: q.limit, offset: q.offset });
+  }
   @Get('managers/permissions') permCatalog() { return this.managers.permissionsCatalog(); }
   @Post('managers') createManager(@CurrentUser() u, @Body() body: any) { return this.managers.create(u.id, body); }
   @Patch('managers/:id') updateManager(@CurrentUser() u, @Param('id') id: string, @Body() body: any) {
@@ -133,7 +154,7 @@ export class AdminController {
 
   // ----- Audit log -----
   @Get('audit') auditList(@Query() q: any) {
-    return this.audit.list(+(q.limit || 100), +(q.offset || 0), { actorId: q.actorId, action: q.action, targetId: q.targetId });
+    return this.audit.list(+(q.limit || 100), +(q.offset || 0), { actorId: q.actorId, action: q.action, targetId: q.targetId, sort: q.sort });
   }
   @Get('audit/count') auditCount(@Query() q: any) {
     return this.audit.count({ actorId: q.actorId, action: q.action }).then((count) => ({ count }));

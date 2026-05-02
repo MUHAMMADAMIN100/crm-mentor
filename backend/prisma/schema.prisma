@@ -220,6 +220,9 @@ model Course {
   teacherId   String
   // Hide from learners (and the public catalog) without archiving the course.
   hidden      Boolean  @default(false)
+  // Delivery format. Free-form so admins can add new formats from the
+  // references panel (online / offline / hybrid / mixed / etc.).
+  format      String?
   teacher     User     @relation("TeacherCourses", fields: [teacherId], references: [id], onDelete: Cascade)
   title       String
   description String?

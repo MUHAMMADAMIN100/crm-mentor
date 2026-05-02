@@ -20,15 +20,41 @@ export class ManagersService {
   constructor(private prisma: PrismaService, private audit: AuditService) {}
 
   /** All admin-role users (super_admin, admin, support, sales). */
-  list() {
-    return this.prisma.user.findMany({
-      where: { role: 'ADMIN' },
-      select: {
-        id: true, login: true, fullName: true, email: true, phone: true, telegram: true,
-        adminLevel: true, permissions: true, archived: true, lastLoginAt: true, createdAt: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+  async list(opts: { search?: string; sort?: string; limit?: string; offset?: string } = {}) {
+    const where: any = { role: 'ADMIN' };
+    const search = opts.search?.trim();
+    if (search) {
+      where.OR = [
+        { fullName: { contains: search, mode: 'insensitive' } },
+        { login: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    let orderBy: any = { createdAt: 'desc' };
+    const sort = opts.sort || '';
+    const desc = sort.startsWith('-');
+    const field = sort.replace(/^-/, '');
+    if (field === 'name') orderBy = { fullName: desc ? 'desc' : 'asc' };
+    else if (field === 'created') orderBy = { createdAt: desc ? 'desc' : 'asc' };
+    else if (field === 'activity') orderBy = { lastLoginAt: desc ? 'desc' : 'asc' };
+    else if (field === 'role') orderBy = { adminLevel: desc ? 'desc' : 'asc' };
+
+    const take = opts.limit ? Math.min(500, Math.max(1, +opts.limit)) : undefined;
+    const skip = opts.offset ? Math.max(0, +opts.offset) : undefined;
+
+    const [items, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        select: {
+          id: true, login: true, fullName: true, email: true, phone: true, telegram: true,
+          adminLevel: true, permissions: true, archived: true, lastLoginAt: true, createdAt: true,
+        },
+        orderBy, take, skip,
+      }),
+      take !== undefined ? this.prisma.user.count({ where }) : Promise.resolve(undefined),
+    ]);
+    if (take !== undefined) return { items, total };
+    return items;
   }
 
   permissionsCatalog() {

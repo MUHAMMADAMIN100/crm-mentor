@@ -10,7 +10,7 @@ export class AdminService {
   // ============================================================
   // Teachers
   // ============================================================
-  async listTeachers(opts: { search?: string; status?: string; archived?: string; sort?: string; activity?: string; hasStudents?: string; hasCourses?: string; limit?: string; offset?: string } = {}) {
+  async listTeachers(opts: { search?: string; status?: string; archived?: string; sort?: string; activity?: string; hasStudents?: string; hasCourses?: string; subType?: string; subEndFrom?: string; subEndTo?: string; limit?: string; offset?: string } = {}) {
     const where: any = { role: 'TEACHER' };
     if (opts.archived === 'archived') where.archived = true;
     else if (opts.archived === 'active') where.archived = false;
@@ -25,26 +25,27 @@ export class AdminService {
         { telegram: { contains: search, mode: 'insensitive' } },
       ];
     }
-    if (opts.status && ['TRIAL', 'ACTIVE', 'EXPIRED', 'BLOCKED', 'PAUSED', 'CANCELED'].includes(opts.status)) {
-      where.teacherSubscription = { status: opts.status };
+    // Subscription filters
+    const subWhere: any = {};
+    if (opts.status && ['TRIAL', 'ACTIVE', 'EXPIRED', 'BLOCKED', 'PAUSED', 'CANCELED'].includes(opts.status)) subWhere.status = opts.status;
+    if (opts.subType && ['MONTH', 'YEAR'].includes(opts.subType)) subWhere.type = opts.subType;
+    if (opts.subEndFrom || opts.subEndTo) {
+      subWhere.endDate = {};
+      if (opts.subEndFrom) subWhere.endDate.gte = new Date(opts.subEndFrom);
+      if (opts.subEndTo) subWhere.endDate.lte = new Date(opts.subEndTo);
     }
+    if (Object.keys(subWhere).length > 0) where.teacherSubscription = subWhere;
+
     if (opts.hasStudents === 'yes') where.teacherStudents = { some: {} };
     else if (opts.hasStudents === 'no') where.teacherStudents = { none: {} };
     if (opts.hasCourses === 'yes') where.teacherCourses = { some: {} };
     else if (opts.hasCourses === 'no') where.teacherCourses = { none: {} };
-    // Activity filter — measured by lastLoginAt window
-    if (opts.activity === '7d') {
-      const cutoff = new Date(Date.now() - 7 * 86400000);
-      where.lastLoginAt = { gte: cutoff };
-    } else if (opts.activity === '30d') {
-      const cutoff = new Date(Date.now() - 30 * 86400000);
-      where.lastLoginAt = { gte: cutoff };
-    } else if (opts.activity === 'inactive7d') {
-      const cutoff = new Date(Date.now() - 7 * 86400000);
-      where.OR = [...(where.OR || []), { lastLoginAt: null }, { lastLoginAt: { lt: cutoff } }];
+    if (opts.activity === '7d') where.lastLoginAt = { gte: new Date(Date.now() - 7 * 86400000) };
+    else if (opts.activity === '30d') where.lastLoginAt = { gte: new Date(Date.now() - 30 * 86400000) };
+    else if (opts.activity === 'inactive7d') {
+      where.OR = [...(where.OR || []), { lastLoginAt: null }, { lastLoginAt: { lt: new Date(Date.now() - 7 * 86400000) } }];
     }
 
-    // Sort: `name`, `-name`, `created`, `-created`, `students`, `-students`, `courses`, `-courses`, `activity`, `-activity`
     let orderBy: any = { createdAt: 'desc' };
     const sort = opts.sort || '';
     const desc = sort.startsWith('-');
@@ -54,6 +55,7 @@ export class AdminService {
     else if (field === 'activity') orderBy = { lastLoginAt: desc ? 'desc' : 'asc' };
     else if (field === 'students') orderBy = { teacherStudents: { _count: desc ? 'desc' : 'asc' } };
     else if (field === 'courses') orderBy = { teacherCourses: { _count: desc ? 'desc' : 'asc' } };
+    else if (field === 'revenue') orderBy = { teacherSubscription: { amount: desc ? 'desc' : 'asc' } };
 
     const take = opts.limit ? Math.min(500, Math.max(1, +opts.limit)) : undefined;
     const skip = opts.offset ? Math.max(0, +opts.offset) : undefined;
@@ -224,7 +226,38 @@ export class AdminService {
       take: 30,
       include: { actor: { select: { id: true, fullName: true, login: true } } },
     });
-    return { teacher: t, stats: { lessonsCompleted, lessonsPlanned }, recentLessons, audit };
+
+    // Real income from this teacher's students (Payment.kind=TOPUP).
+    const studentIds = (t.teacherStudents || []).map((sp: any) => sp.id);
+    const [paymentsAgg, recentStudentPayments] = await Promise.all([
+      studentIds.length > 0 ? this.prisma.payment.groupBy({
+        by: ['kind'],
+        where: { studentId: { in: studentIds } },
+        _sum: { amount: true },
+      }) : Promise.resolve([] as any),
+      studentIds.length > 0 ? this.prisma.payment.findMany({
+        where: { studentId: { in: studentIds } },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        include: { student: { include: { user: { select: { id: true, fullName: true, login: true } } } } },
+      }) : Promise.resolve([] as any),
+    ]);
+    const incoming = (paymentsAgg as any[]).find((x: any) => x.kind === 'TOPUP')?._sum?.amount || 0;
+    const charged = (paymentsAgg as any[]).find((x: any) => x.kind === 'CHARGE')?._sum?.amount || 0;
+
+    return {
+      teacher: t,
+      stats: {
+        lessonsCompleted,
+        lessonsPlanned,
+        studentIncoming: incoming,
+        studentCharged: charged,
+        netStudentPayments: incoming - charged,
+      },
+      recentLessons,
+      recentStudentPayments,
+      audit,
+    };
   }
 
   /** Edit basic teacher profile fields. */
@@ -573,19 +606,65 @@ export class AdminService {
       },
     });
     if (!u || u.role !== 'STUDENT') throw new NotFoundException();
-    const lessonsCount = u.studentProfile
-      ? await this.prisma.lesson.count({ where: { studentProfileId: u.studentProfile.id } })
+    const sp = u.studentProfile;
+
+    const [lessonsTotal, lessonsCompleted, lessonsPlanned, hwTotal, hwCompleted, hwOverdue, blockProgress, quizSubmissions, audit, chats, recentMessages] = await Promise.all([
+      sp ? this.prisma.lesson.count({ where: { studentProfileId: sp.id } }) : Promise.resolve(0),
+      sp ? this.prisma.lesson.count({ where: { studentProfileId: sp.id, status: 'COMPLETED' } }) : Promise.resolve(0),
+      sp ? this.prisma.lesson.count({ where: { studentProfileId: sp.id, status: 'PLANNED' } }) : Promise.resolve(0),
+      this.prisma.homeworkSubmission.count({ where: { studentId: studentUserId } }),
+      this.prisma.homeworkSubmission.count({ where: { studentId: studentUserId, status: 'COMPLETED' } }),
+      this.prisma.homeworkSubmission.count({ where: { studentId: studentUserId, status: 'OVERDUE' } }),
+      this.prisma.blockProgress.count({ where: { studentId: studentUserId } }),
+      this.prisma.quizSubmission.findMany({
+        where: { studentId: studentUserId },
+        select: { score: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        take: 30,
+      }),
+      this.prisma.auditLog.findMany({
+        where: { OR: [{ targetId: studentUserId }, { actorId: studentUserId }] },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        include: { actor: { select: { id: true, fullName: true, login: true } } },
+      }),
+      this.prisma.chat.findMany({
+        where: { members: { some: { userId: studentUserId } } },
+        select: { id: true, title: true, type: true, members: { include: { user: { select: { id: true, fullName: true, login: true, role: true } } } } },
+      }),
+      this.prisma.message.findMany({
+        where: { chat: { members: { some: { userId: studentUserId } } } },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        include: { sender: { select: { id: true, fullName: true, role: true } } },
+      }),
+    ]);
+
+    const avgQuiz = quizSubmissions.length > 0
+      ? Math.round(quizSubmissions.reduce((s: number, x: any) => s + (x.score || 0), 0) / quizSubmissions.length * 100)
       : 0;
-    const completedHomework = await this.prisma.homeworkSubmission.count({
-      where: { studentId: studentUserId, status: 'COMPLETED' },
-    });
-    const audit = await this.prisma.auditLog.findMany({
-      where: { OR: [{ targetId: studentUserId }, { actorId: studentUserId }] },
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-      include: { actor: { select: { id: true, fullName: true, login: true } } },
-    });
-    return { user: u, stats: { lessonsCount, completedHomework }, audit };
+    const attendance = lessonsTotal > 0 ? Math.round((lessonsCompleted / lessonsTotal) * 100) : 0;
+    const hwCompletion = hwTotal > 0 ? Math.round((hwCompleted / hwTotal) * 100) : 0;
+
+    return {
+      user: u,
+      stats: {
+        lessonsCount: lessonsTotal,
+        lessonsCompleted,
+        lessonsPlanned,
+        attendance,
+        hwTotal,
+        hwCompleted,
+        hwOverdue,
+        hwCompletion,
+        blockProgress,
+        avgQuizScore: avgQuiz,
+        quizCount: quizSubmissions.length,
+      },
+      audit,
+      chats,
+      recentMessages,
+    };
   }
 
   /** Move a student to another teacher. */
@@ -606,10 +685,11 @@ export class AdminService {
   // ============================================================
   // Courses
   // ============================================================
-  async listCourses(opts: { search?: string; status?: string; teacherId?: string } = {}) {
+  async listCourses(opts: { search?: string; status?: string; teacherId?: string; format?: string; sort?: string; limit?: string; offset?: string } = {}) {
     const where: any = {};
     if (opts.status && ['DRAFT', 'PUBLISHED_PRIVATE', 'ARCHIVED'].includes(opts.status)) where.status = opts.status;
     if (opts.teacherId) where.teacherId = opts.teacherId;
+    if (opts.format && opts.format !== 'all') where.format = opts.format;
     const search = opts.search?.trim();
     if (search) {
       where.OR = [
@@ -617,11 +697,28 @@ export class AdminService {
         { teacher: { fullName: { contains: search, mode: 'insensitive' } } },
       ];
     }
-    return this.prisma.course.findMany({
-      where,
-      include: { teacher: { select: { id: true, fullName: true, login: true } }, _count: { select: { modules: true, accesses: true } } },
-      orderBy: { createdAt: 'desc' },
-    });
+    let orderBy: any = { createdAt: 'desc' };
+    const sort = opts.sort || '';
+    const desc = sort.startsWith('-');
+    const field = sort.replace(/^-/, '');
+    if (field === 'title') orderBy = { title: desc ? 'desc' : 'asc' };
+    else if (field === 'created') orderBy = { createdAt: desc ? 'desc' : 'asc' };
+    else if (field === 'updated') orderBy = { updatedAt: desc ? 'desc' : 'asc' };
+    else if (field === 'modules') orderBy = { modules: { _count: desc ? 'desc' : 'asc' } };
+    else if (field === 'students') orderBy = { accesses: { _count: desc ? 'desc' : 'asc' } };
+
+    const take = opts.limit ? Math.min(500, Math.max(1, +opts.limit)) : undefined;
+    const skip = opts.offset ? Math.max(0, +opts.offset) : undefined;
+    const [items, total] = await Promise.all([
+      this.prisma.course.findMany({
+        where,
+        include: { teacher: { select: { id: true, fullName: true, login: true } }, _count: { select: { modules: true, accesses: true } } },
+        orderBy, take, skip,
+      }),
+      take !== undefined ? this.prisma.course.count({ where }) : Promise.resolve(undefined),
+    ]);
+    if (take !== undefined) return { items, total };
+    return items;
   }
 
   async getCourseCard(courseId: string) {
@@ -641,6 +738,83 @@ export class AdminService {
     const c = await this.prisma.course.update({ where: { id: courseId }, data: { status } });
     this.audit.log(actorId, 'course.status', { targetType: 'Course', targetId: courseId, meta: { status } });
     return c;
+  }
+
+  async setCourseFormat(actorId: string, courseId: string, format: string) {
+    const c = await this.prisma.course.update({ where: { id: courseId }, data: { format: format || null } });
+    this.audit.log(actorId, 'course.format', { targetType: 'Course', targetId: courseId, meta: { format } });
+    return c;
+  }
+
+  /**
+   * Per-student progress for a single course: sum of completed blocks /
+   * total blocks across all lessons of this course.
+   */
+  async courseProgress(courseId: string) {
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      include: {
+        modules: { include: { lessons: { include: { blocks: { select: { id: true } } } } } },
+        accesses: { include: { student: { include: { user: { select: { id: true, fullName: true, login: true } } } } } },
+      },
+    });
+    if (!course) throw new NotFoundException();
+    const blockIds: string[] = [];
+    course.modules.forEach((m: any) => m.lessons.forEach((l: any) => l.blocks.forEach((b: any) => blockIds.push(b.id))));
+    const totalBlocks = blockIds.length;
+    if (totalBlocks === 0) return { totalBlocks: 0, students: [] };
+    const studentUserIds = course.accesses.map((a: any) => a.student.user.id);
+    const progress = studentUserIds.length > 0 ? await this.prisma.blockProgress.findMany({
+      where: { studentId: { in: studentUserIds }, blockId: { in: blockIds }, done: true },
+      select: { studentId: true },
+    }) : [];
+    const doneByUser = new Map<string, number>();
+    progress.forEach((p: any) => doneByUser.set(p.studentId, (doneByUser.get(p.studentId) || 0) + 1));
+
+    const students = course.accesses.map((a: any) => {
+      const done = doneByUser.get(a.student.user.id) || 0;
+      return {
+        accessId: a.id,
+        studentId: a.student.user.id,
+        studentProfileId: a.student.id,
+        fullName: a.student.user.fullName,
+        login: a.student.user.login,
+        done,
+        total: totalBlocks,
+        percent: totalBlocks > 0 ? Math.round((done / totalBlocks) * 100) : 0,
+      };
+    }).sort((a: any, b: any) => b.percent - a.percent);
+
+    const avgPercent = students.length > 0
+      ? Math.round(students.reduce((s: number, x: any) => s + x.percent, 0) / students.length)
+      : 0;
+    return { totalBlocks, avgPercent, students };
+  }
+
+  /** Mass-extend the subscriptions for a list of teachers by N months. */
+  async bulkExtendSubscriptions(actorId: string, teacherIds: string[], months: number, comment?: string) {
+    let updated = 0;
+    for (const tid of teacherIds) {
+      try {
+        await this.extendSubscription(actorId, tid, months, undefined, comment);
+        updated++;
+      } catch { /* swallow individual errors */ }
+    }
+    this.audit.log(actorId, 'bulk.extendSubs', { meta: { count: updated, months } });
+    return { count: updated };
+  }
+
+  /** Mass-set status on subscriptions for a list of teachers. */
+  async bulkSetSubStatus(actorId: string, teacherIds: string[], status: any, comment?: string) {
+    let updated = 0;
+    for (const tid of teacherIds) {
+      try {
+        await this.setSubscriptionStatus(actorId, tid, status, comment);
+        updated++;
+      } catch { /* swallow */ }
+    }
+    this.audit.log(actorId, 'bulk.setSubStatus', { meta: { count: updated, status } });
+    return { count: updated };
   }
 
   /** Toggle the hidden flag (independent of archive). Hidden courses don't show in catalog/learners. */
@@ -714,10 +888,11 @@ export class AdminService {
   // ============================================================
   // Finance
   // ============================================================
-  async finance(opts: { search?: string; status?: string; period?: string; source?: string; managerId?: string } = {}) {
+  async finance(opts: { search?: string; status?: string; period?: string; source?: string; managerId?: string; subType?: string; sort?: string; limit?: string; offset?: string } = {}) {
     const where: any = {};
     if (opts.status && opts.status !== 'all') where.status = opts.status;
     if (opts.source && opts.source !== 'all') where.source = opts.source;
+    if (opts.subType && ['MONTH', 'YEAR'].includes(opts.subType)) where.type = opts.subType;
     const search = opts.search?.trim();
     if (search) {
       where.teacher = {
@@ -728,7 +903,6 @@ export class AdminService {
         ],
       };
     }
-    // If filtering by manager, only return subs whose latest history entry is by this manager.
     if (opts.managerId && opts.managerId !== 'all') {
       const latest = await this.prisma.subscriptionHistory.findMany({
         where: { actorId: opts.managerId },
@@ -737,14 +911,33 @@ export class AdminService {
       });
       where.id = { in: latest.map((h) => h.subscriptionId) };
     }
-    const subs = await this.prisma.subscription.findMany({
-      where,
-      include: {
-        teacher: { select: { id: true, fullName: true, login: true, email: true, archived: true } },
-        history: { orderBy: { createdAt: 'desc' }, take: 1, include: { actor: { select: { id: true, fullName: true, login: true } } } },
-      },
-      orderBy: { updatedAt: 'desc' },
-    });
+
+    // Sort
+    let orderBy: any = { updatedAt: 'desc' };
+    const sort = opts.sort || '';
+    const desc = sort.startsWith('-');
+    const field = sort.replace(/^-/, '');
+    if (field === 'amount') orderBy = { amount: desc ? 'desc' : 'asc' };
+    else if (field === 'endDate') orderBy = { endDate: desc ? 'desc' : 'asc' };
+    else if (field === 'startDate') orderBy = { startDate: desc ? 'desc' : 'asc' };
+    else if (field === 'status') orderBy = { status: desc ? 'desc' : 'asc' };
+    else if (field === 'updated') orderBy = { updatedAt: desc ? 'desc' : 'asc' };
+
+    const take = opts.limit ? Math.min(500, Math.max(1, +opts.limit)) : undefined;
+    const skip = opts.offset ? Math.max(0, +opts.offset) : undefined;
+
+    const [subs, total] = await Promise.all([
+      this.prisma.subscription.findMany({
+        where,
+        include: {
+          teacher: { select: { id: true, fullName: true, login: true, email: true, archived: true } },
+          history: { orderBy: { createdAt: 'desc' }, take: 1, include: { actor: { select: { id: true, fullName: true, login: true } } } },
+        },
+        orderBy,
+        take, skip,
+      }),
+      take !== undefined ? this.prisma.subscription.count({ where }) : Promise.resolve(undefined),
+    ]);
 
     // KPIs
     const now = new Date();
@@ -780,6 +973,7 @@ export class AdminService {
       churnRate,
       counts,
       subscriptions: subs,
+      total,
     };
   }
 

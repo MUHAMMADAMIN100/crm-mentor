@@ -87,6 +87,26 @@ export class AiContextService {
       return { id: t.id, fullName: t.fullName, login: t.login, score, reasons };
     }).filter((x: any) => x.score >= 25).sort((a: any, b: any) => b.score - a.score).slice(0, 15);
 
+    // Manager performance (last 30 days) — derived from audit log.
+    const managers = await this.prisma.user.findMany({
+      where: { role: 'ADMIN', archived: false },
+      select: { id: true, fullName: true, login: true, adminLevel: true },
+    });
+    const managerPerf = await Promise.all(managers.map(async (m: any) => {
+      const [creates, edits, archives, subs, total] = await Promise.all([
+        this.prisma.auditLog.count({ where: { actorId: m.id, action: { contains: '.create' }, createdAt: { gte: ago30d } } }),
+        this.prisma.auditLog.count({ where: { actorId: m.id, action: { contains: '.edit' }, createdAt: { gte: ago30d } } }),
+        this.prisma.auditLog.count({ where: { actorId: m.id, action: { contains: '.archive' }, createdAt: { gte: ago30d } } }),
+        this.prisma.auditLog.count({ where: { actorId: m.id, action: { startsWith: 'subscription.' }, createdAt: { gte: ago30d } } }),
+        this.prisma.auditLog.count({ where: { actorId: m.id, createdAt: { gte: ago30d } } }),
+      ]);
+      // Score = subs × 3 + creates × 2 + edits + archives (subs weigh most because they
+      // directly affect revenue retention).
+      const score = subs * 3 + creates * 2 + edits + archives;
+      return { fullName: m.fullName, login: m.login, role: m.adminLevel, creates, edits, archives, subs, total, score };
+    }));
+    managerPerf.sort((a, b) => b.score - a.score);
+
     return {
       summary: {
         teachers: teachersCount,
@@ -108,6 +128,7 @@ export class AiContextService {
         inactiveTeachers7d: inactiveTeachers.map((t: any) => ({ fullName: t.fullName, login: t.login, lastLoginAt: t.lastLoginAt })),
         riskList,
       },
+      managerPerformance30d: managerPerf,
     };
   }
 
