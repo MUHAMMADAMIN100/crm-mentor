@@ -75,6 +75,17 @@ export function AdminHome() {
       <h3 className="admin-section-title">{t('admin.attentionTitle')}</h3>
       <div className="cards-grid">
         <AttentionCard
+          title={t('admin.attention.subsExpiring3d')}
+          color="danger"
+          items={(a.subsExpiringIn3d || []).map((s: any) => ({
+            id: s.id,
+            primary: s.teacher?.fullName || s.teacherId,
+            secondary: s.endDate ? `${t('admin.attention.until')} ${new Date(s.endDate).toLocaleDateString()}` : '',
+            link: `/admin/teachers/${s.teacher?.id || s.teacherId}`,
+          }))}
+          emptyText={t('admin.attention.noExpiring3d')}
+        />
+        <AttentionCard
           title={t('admin.attention.subsExpiring')}
           color="warning"
           items={(a.subsExpiringSoon || []).map((s: any) => ({
@@ -128,6 +139,39 @@ export function AdminHome() {
             link: `/admin/teachers/${u.id}`,
           }))}
           emptyText={t('admin.attention.allActive')}
+        />
+        <AttentionCard
+          title={t('admin.attention.inactive14d')}
+          color="danger"
+          items={(a.inactiveTeachers14d || []).map((u: any) => ({
+            id: u.id,
+            primary: u.fullName,
+            secondary: u.login + (u.lastLoginAt ? ` · ${new Date(u.lastLoginAt).toLocaleDateString()}` : ''),
+            link: `/admin/teachers/${u.id}`,
+          }))}
+          emptyText={t('admin.attention.allActive')}
+        />
+        <AttentionCard
+          title={t('admin.attention.inactiveStudents')}
+          color="warning"
+          items={(a.inactiveStudents || []).map((u: any) => ({
+            id: u.id,
+            primary: u.fullName,
+            secondary: u.login + (u.lastLoginAt ? ` · ${new Date(u.lastLoginAt).toLocaleDateString()}` : ` · ${t('admin.attention.neverLogged')}`),
+            link: `/admin/students/${u.id}`,
+          }))}
+          emptyText={t('admin.attention.allStudentsActive')}
+        />
+        <AttentionCard
+          title={t('admin.attention.problemAccounts')}
+          color="danger"
+          items={(a.problemAccounts || []).map((u: any) => ({
+            id: u.id,
+            primary: u.fullName,
+            secondary: u.login + (u.reason ? ` · ${u.reason}` : ''),
+            link: `/admin/students/${u.id}`,
+          }))}
+          emptyText={t('admin.attention.noProblems')}
         />
       </div>
 

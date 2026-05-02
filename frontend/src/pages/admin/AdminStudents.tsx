@@ -18,6 +18,7 @@ export function AdminStudents() {
   const [tag, setTag] = useState('');
   const [sort, setSort] = useState('-created');
   const [teacherId, setTeacherId] = useState('');
+  const [groupId, setGroupId] = useState('');
   const [offset, setOffset] = useState(0);
   const limit = 50;
 
@@ -27,6 +28,7 @@ export function AdminStudents() {
     ...(activity !== 'any' ? { activity } : {}),
     ...(tag ? { tag } : {}),
     ...(teacherId ? { teacherId } : {}),
+    ...(groupId ? { groupId } : {}),
     ...(sort ? { sort } : {}),
     limit: String(limit),
     offset: String(offset),
@@ -36,6 +38,8 @@ export function AdminStudents() {
   const total: number = response?.total || 0;
   const { data: teachers } = useApi<any>('/admin/teachers');
   const teachersList: any[] = Array.isArray(teachers) ? teachers : (teachers as any)?.items || [];
+  const { data: groupsData } = useApi<any[]>('/admin/groups');
+  const groupsList: any[] = groupsData || [];
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [importOpen, setImportOpen] = useState(false);
@@ -158,6 +162,10 @@ export function AdminStudents() {
         <select className="select" value={teacherId} onChange={(e) => { setTeacherId(e.target.value); setOffset(0); }}>
           <option value="">{t('admin.filter.teacherAny')}</option>
           {teachersList.map((tt: any) => <option key={tt.id} value={tt.id}>{tt.fullName}</option>)}
+        </select>
+        <select className="select" value={groupId} onChange={(e) => { setGroupId(e.target.value); setOffset(0); }}>
+          <option value="">{t('admin.filter.groupAny')}</option>
+          {groupsList.map((g: any) => <option key={g.id} value={g.id}>{g.name}{g.teacher ? ` · ${g.teacher.fullName}` : ''}</option>)}
         </select>
         <div className="spacer" />
         <button className="btn" onClick={exportSelected}>⬇ CSV</button>

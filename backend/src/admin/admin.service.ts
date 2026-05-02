@@ -543,7 +543,7 @@ export class AdminService {
   // ============================================================
   // Students
   // ============================================================
-  async listStudents(opts: { search?: string; archived?: string; teacherId?: string; tag?: string; sort?: string; activity?: string; limit?: string; offset?: string } = {}) {
+  async listStudents(opts: { search?: string; archived?: string; teacherId?: string; groupId?: string; tag?: string; sort?: string; activity?: string; limit?: string; offset?: string } = {}) {
     const where: any = { role: 'STUDENT' };
     if (opts.archived === 'archived') where.archived = true;
     else if (opts.archived === 'active') where.archived = false;
@@ -556,8 +556,12 @@ export class AdminService {
         { email: { contains: search, mode: 'insensitive' } },
       ];
     }
-    if (opts.teacherId) {
-      where.studentProfile = { teacherId: opts.teacherId };
+    // teacherId and groupId both narrow the student profile.
+    if (opts.teacherId || opts.groupId) {
+      where.studentProfile = {
+        ...(opts.teacherId ? { teacherId: opts.teacherId } : {}),
+        ...(opts.groupId ? { groups: { some: { groupId: opts.groupId } } } : {}),
+      };
     }
     if (opts.activity === '7d') {
       where.lastLoginAt = { gte: new Date(Date.now() - 7 * 86400000) };
@@ -680,6 +684,16 @@ export class AdminService {
     const u = await this.prisma.user.update({ where: { id: studentUserId }, data: { tags } });
     this.audit.log(actorId, 'student.tags', { targetType: 'User', targetId: studentUserId, meta: { tags } });
     return u;
+  }
+
+  // ============================================================
+  // Groups (light list for admin filters)
+  // ============================================================
+  async listGroups() {
+    return this.prisma.group.findMany({
+      select: { id: true, name: true, teacher: { select: { id: true, fullName: true } }, _count: { select: { members: true } } },
+      orderBy: { name: 'asc' },
+    });
   }
 
   // ============================================================
@@ -1114,6 +1128,7 @@ export class AdminService {
     const in7d = new Date(now.getTime() + 7 * 86400000);
     const in3d = new Date(now.getTime() + 3 * 86400000);
     const ago7d = new Date(now.getTime() - 7 * 86400000);
+    const ago14d = new Date(now.getTime() - 14 * 86400000);
     const ago30d = new Date(now.getTime() - 30 * 86400000);
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -1124,8 +1139,9 @@ export class AdminService {
       lessonsToday, lessonsCompletedTotal,
       newTeachers7d, newStudents7d, newTeachers30d, newStudents30d,
       paymentsThisMonth,
-      subsExpiringSoon, subsExpired,
+      subsExpiringIn3d, subsExpiringSoon, subsExpired,
       teachersNoStudents, teachersNoCourses,
+      problemStudents, negativeBalanceStudents,
       recentTeachers, recentStudents, recentSubs, recentAudit,
     ] = await Promise.all([
       this.prisma.user.count({ where: { role: 'TEACHER' } }),
@@ -1147,8 +1163,15 @@ export class AdminService {
         where: { startDate: { gte: monthStart }, status: { in: ['ACTIVE', 'TRIAL'] } },
         _sum: { amount: true },
       }),
+      // Subs expiring in the next 3 days (more urgent than the 7d bucket below).
       this.prisma.subscription.findMany({
-        where: { status: 'ACTIVE', endDate: { gte: now, lte: in7d } },
+        where: { status: 'ACTIVE', endDate: { gte: now, lte: in3d } },
+        include: { teacher: { select: { id: true, fullName: true, login: true } } },
+        orderBy: { endDate: 'asc' },
+      }),
+      // Subs expiring in days 4..7.
+      this.prisma.subscription.findMany({
+        where: { status: 'ACTIVE', endDate: { gt: in3d, lte: in7d } },
         include: { teacher: { select: { id: true, fullName: true, login: true } } },
         orderBy: { endDate: 'asc' },
       }),
@@ -1167,6 +1190,19 @@ export class AdminService {
         where: { role: 'TEACHER', archived: false, teacherCourses: { none: {} } },
         select: { id: true, fullName: true, login: true, createdAt: true },
         take: 10,
+      }),
+      // Students explicitly tagged as a problem (e.g. payment dispute, complaint).
+      this.prisma.user.findMany({
+        where: { role: 'STUDENT', archived: false, tags: { contains: 'problem' } },
+        select: { id: true, fullName: true, login: true, tags: true, lastLoginAt: true },
+        take: 15,
+      }),
+      // Students with a negative balance — they technically owe their teacher money.
+      this.prisma.studentProfile.findMany({
+        where: { balance: { lt: 0 } },
+        include: { user: { select: { id: true, fullName: true, login: true } } },
+        orderBy: { balance: 'asc' },
+        take: 15,
       }),
       this.prisma.user.findMany({
         where: { role: 'TEACHER' },
@@ -1192,19 +1228,32 @@ export class AdminService {
       }),
     ]);
 
-    const activeTeacherIdsRaw = await this.prisma.lesson.findMany({
-      where: { startAt: { gte: ago7d } },
-      distinct: ['teacherId'],
-      select: { teacherId: true },
-    });
-    const activeIds = new Set(activeTeacherIdsRaw.map((x) => x.teacherId));
+    const [activeTeacher7dRaw, activeTeacher14dRaw] = await Promise.all([
+      this.prisma.lesson.findMany({ where: { startAt: { gte: ago7d } }, distinct: ['teacherId'], select: { teacherId: true } }),
+      this.prisma.lesson.findMany({ where: { startAt: { gte: ago14d } }, distinct: ['teacherId'], select: { teacherId: true } }),
+    ]);
+    const active7d = new Set(activeTeacher7dRaw.map((x: any) => x.teacherId));
+    const active14d = new Set(activeTeacher14dRaw.map((x: any) => x.teacherId));
     const allActiveTeachers = await this.prisma.user.findMany({
       where: { role: 'TEACHER', archived: false },
       select: { id: true, fullName: true, login: true, lastLoginAt: true, createdAt: true },
     });
-    const inactiveTeachers = allActiveTeachers
-      .filter((t) => !activeIds.has(t.id))
-      .slice(0, 10);
+    const inactiveTeachers = allActiveTeachers.filter((t: any) => !active7d.has(t.id)).slice(0, 10);
+    // 14-day inactivity: harder cut-off — teachers that don't even appear in
+    // the 14-day-active set. These are the ones most likely to churn.
+    const inactiveTeachers14d = allActiveTeachers.filter((t: any) => !active14d.has(t.id)).slice(0, 10);
+
+    // Students who haven't logged in for 14+ days (or never logged in).
+    const inactiveStudents = await this.prisma.user.findMany({
+      where: {
+        role: 'STUDENT',
+        archived: false,
+        OR: [{ lastLoginAt: null }, { lastLoginAt: { lt: ago14d } }],
+      },
+      select: { id: true, fullName: true, login: true, lastLoginAt: true, createdAt: true },
+      orderBy: { lastLoginAt: 'asc' },
+      take: 10,
+    });
 
     // 12-month growth chart
     const since12m = new Date(); since12m.setMonth(since12m.getMonth() - 11); since12m.setDate(1); since12m.setHours(0, 0, 0, 0);
@@ -1225,11 +1274,25 @@ export class AdminService {
         revenueThisMonth: paymentsThisMonth._sum.amount || 0,
       },
       attention: {
+        subsExpiringIn3d,
         subsExpiringSoon,
         subsExpired,
         teachersNoStudents,
         teachersNoCourses,
         inactiveTeachers,
+        inactiveTeachers14d,
+        inactiveStudents,
+        problemAccounts: [
+          ...problemStudents.map((s: any) => ({
+            id: s.id, fullName: s.fullName, login: s.login,
+            reason: 'tag:problem',
+            tags: s.tags,
+          })),
+          ...negativeBalanceStudents.map((sp: any) => ({
+            id: sp.user.id, fullName: sp.user.fullName, login: sp.user.login,
+            reason: `balance: ${sp.balance.toLocaleString()} ₽`,
+          })),
+        ].slice(0, 15),
       },
       recent: {
         teachers: recentTeachers,

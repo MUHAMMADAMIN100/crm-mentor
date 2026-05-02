@@ -59,6 +59,7 @@ export function AdminCourses() {
                 <th>{t('course.status')}</th>
                 <SortHeader field="modules" label={t('admin.course.modules')} sort={sort} onSort={setSort} />
                 <SortHeader field="students" label={t('course.studentsCount')} sort={sort} onSort={setSort} />
+                <SortHeader field="created" label={t('admin.teacher.createdAt')} sort={sort} onSort={setSort} />
                 <SortHeader field="updated" label={t('admin.fin.col.updated')} sort={sort} onSort={setSort} />
               </tr>
             </thead>
@@ -79,10 +80,11 @@ export function AdminCourses() {
                   </td>
                   <td>{c._count?.modules}</td>
                   <td>{c._count?.accesses}</td>
+                  <td className="muted" style={{ fontSize: 12 }}>{new Date(c.createdAt).toLocaleDateString()}</td>
                   <td className="muted" style={{ fontSize: 12 }}>{new Date(c.updatedAt).toLocaleDateString()}</td>
                 </tr>
               ))}
-              {list.length === 0 && <tr><td colSpan={7} className="empty">{search || status !== 'all' ? t('empty.noFound') : t('empty.noCourses')}</td></tr>}
+              {list.length === 0 && <tr><td colSpan={8} className="empty">{search || status !== 'all' ? t('empty.noFound') : t('empty.noCourses')}</td></tr>}
             </tbody>
           </table>
           <Paginator total={total} limit={limit} offset={offset} onChange={setOffset} />

@@ -70,10 +70,11 @@ export class AdminController {
   // ----- Students -----
   @Get('students') students(@Query() q: any) {
     return this.svc.listStudents({
-      search: q.search, archived: q.archived, teacherId: q.teacherId, tag: q.tag,
+      search: q.search, archived: q.archived, teacherId: q.teacherId, groupId: q.groupId, tag: q.tag,
       sort: q.sort, activity: q.activity, limit: q.limit, offset: q.offset,
     });
   }
+  @Get('groups') groups() { return this.svc.listGroups(); }
   @Get('students/:id') studentCard(@Param('id') id: string) { return this.svc.getStudentCard(id); }
   @Patch('students/:id/transfer') transferStudent(@CurrentUser() u, @Param('id') id: string, @Body() body: { newTeacherId: string }) {
     return this.svc.transferStudent(u.id, id, body.newTeacherId);
