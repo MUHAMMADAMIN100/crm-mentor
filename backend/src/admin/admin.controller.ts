@@ -20,7 +20,11 @@ export class AdminController {
 
   // ----- Teachers -----
   @Get('teachers') teachers(@Query() q: any) {
-    return this.svc.listTeachers({ search: q.search, status: q.status, archived: q.archived, sort: q.sort });
+    return this.svc.listTeachers({
+      search: q.search, status: q.status, archived: q.archived, sort: q.sort,
+      activity: q.activity, hasStudents: q.hasStudents, hasCourses: q.hasCourses,
+      limit: q.limit, offset: q.offset,
+    });
   }
   @Post('teachers') createTeacher(@CurrentUser() u, @Body() body: any) { return this.svc.createTeacher(u.id, body); }
   @Get('teachers/:id') teacherCard(@Param('id') id: string) { return this.svc.getTeacherCard(id); }
@@ -58,7 +62,10 @@ export class AdminController {
 
   // ----- Students -----
   @Get('students') students(@Query() q: any) {
-    return this.svc.listStudents({ search: q.search, archived: q.archived, teacherId: q.teacherId, tag: q.tag });
+    return this.svc.listStudents({
+      search: q.search, archived: q.archived, teacherId: q.teacherId, tag: q.tag,
+      sort: q.sort, activity: q.activity, limit: q.limit, offset: q.offset,
+    });
   }
   @Get('students/:id') studentCard(@Param('id') id: string) { return this.svc.getStudentCard(id); }
   @Patch('students/:id/transfer') transferStudent(@CurrentUser() u, @Param('id') id: string, @Body() body: { newTeacherId: string }) {

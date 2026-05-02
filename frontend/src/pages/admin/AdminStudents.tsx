@@ -1,93 +1,160 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Shell } from '../../components/Shell';
-import { api, invalidateApi, mutateCache } from '../../api';
+import { api, invalidateApi } from '../../api';
 import { useApi } from '../../hooks';
 import { SkeletonTable } from '../../components/Skeleton';
-import { toast, confirmDialog } from '../../store';
+import { toast } from '../../store';
 import { useT } from '../../i18n';
-import { StatusBadge } from '../../components/AdminUI';
-
-type StatusFilter = 'ALL' | 'active' | 'archived';
+import { StatusBadge, BulkBar, SortHeader } from '../../components/AdminUI';
+import { ArchiveReasonModal } from '../../components/ArchiveReasonModal';
 
 export function AdminStudents() {
   const { t } = useT();
-  const { data: list, loading } = useApi<any[]>('/admin/students');
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<StatusFilter>('ALL');
+  const [archived, setArchived] = useState('all');
+  const [activity, setActivity] = useState('any');
+  const [tag, setTag] = useState('');
+  const [sort, setSort] = useState('-created');
 
-  const visible = useMemo(() => {
-    if (!list) return [];
-    let v = list.slice();
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      v = v.filter((u: any) =>
-        (u.fullName || '').toLowerCase().includes(q) ||
-        (u.login || '').toLowerCase().includes(q) ||
-        (u.email || '').toLowerCase().includes(q) ||
-        (u.studentProfile?.teacher?.fullName || '').toLowerCase().includes(q),
-      );
-    }
-    if (filter === 'active') v = v.filter((u: any) => !u.archived);
-    else if (filter === 'archived') v = v.filter((u: any) => u.archived);
-    return v;
-  }, [list, search, filter]);
+  const url = `/admin/students?${new URLSearchParams({
+    ...(search ? { search } : {}),
+    ...(archived !== 'all' ? { archived } : {}),
+    ...(activity !== 'any' ? { activity } : {}),
+    ...(tag ? { tag } : {}),
+    ...(sort ? { sort } : {}),
+  }).toString()}`;
+  const { data: list, loading, refetch } = useApi<any[]>(url);
 
-  async function archive(id: string, archived: boolean) {
-    const prev = list || [];
-    mutateCache<any[]>('/admin/students', undefined, (cur) =>
-      (cur || []).map((s) => s.id === id ? { ...s, archived: !archived } : s),
-    );
-    try {
-      if (archived) await api.patch(`/admin/users/${id}/unarchive`);
-      else await api.patch(`/admin/users/${id}/archive`);
-      invalidateApi('/admin/students');
-      toast.success(archived ? t('students.unarchived') : t('students.archived'));
-    } catch {
-      mutateCache<any[]>('/admin/students', undefined, () => prev);
-      toast.error(t('toast.error'));
-    }
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [archiveTarget, setArchiveTarget] = useState<any>(null);
+  const [bulkArchiveOpen, setBulkArchiveOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
+
+  function toggleAll() {
+    if (!list) return;
+    if (selected.size === list.length) setSelected(new Set());
+    else setSelected(new Set(list.map((u: any) => u.id)));
   }
-  async function remove(id: string) {
-    const ok = await confirmDialog({
-      title: t('students.confirmDelete'),
-      body: t('students.confirmDeleteBody'),
-      danger: true, okLabel: t('btn.delete'),
-    });
-    if (!ok) return;
-    const prev = list || [];
-    mutateCache<any[]>('/admin/students', undefined, (cur) => (cur || []).filter((s) => s.id !== id));
+  function toggleOne(id: string) {
+    const next = new Set(selected);
+    next.has(id) ? next.delete(id) : next.add(id);
+    setSelected(next);
+  }
+
+  async function archiveOne(id: string, reason: string) {
+    setArchiveTarget(null);
     try {
-      await api.delete(`/admin/users/${id}`);
+      await api.patch(`/admin/users/${id}/archive`, { reason });
       invalidateApi('/admin/students');
+      refetch();
+      toast.success(t('students.archived'));
+    } catch { toast.error(t('toast.error')); }
+  }
+  async function unarchive(id: string) {
+    try {
+      await api.patch(`/admin/users/${id}/unarchive`);
+      invalidateApi('/admin/students');
+      refetch();
+      toast.success(t('students.unarchived'));
+    } catch { toast.error(t('toast.error')); }
+  }
+  async function deleteOne(id: string, reason: string) {
+    setDeleteTarget(null);
+    try {
+      await api.delete(`/admin/users/${id}?reason=${encodeURIComponent(reason)}`);
+      invalidateApi('/admin/students');
+      refetch();
       toast.success(t('students.deleted'));
-    } catch {
-      mutateCache<any[]>('/admin/students', undefined, () => prev);
-      toast.error(t('toast.notDeleted'));
-    }
+    } catch (e: any) { toast.error(e?.response?.data?.message || t('toast.notDeleted')); }
   }
+  async function bulkArchive(reason: string) {
+    setBulkArchiveOpen(false);
+    const ids = Array.from(selected);
+    setSelected(new Set());
+    try {
+      await api.post('/admin/users/bulk-archive', { ids, reason });
+      invalidateApi('/admin/students');
+      refetch();
+      toast.success(`${t('admin.bulk.archived')}: ${ids.length}`);
+    } catch { toast.error(t('toast.error')); }
+  }
+
+  function exportSelected() {
+    if (!list) return;
+    const items = selected.size > 0 ? list.filter((u: any) => selected.has(u.id)) : list;
+    const rows: string[][] = [];
+    rows.push(['ФИО', 'Логин', 'Email', 'Телефон', 'Учитель', 'Теги', 'Создан']);
+    items.forEach((u: any) => rows.push([
+      u.fullName || '',
+      u.login || '',
+      u.email || '',
+      u.phone || '',
+      u.studentProfile?.teacher?.fullName || '',
+      u.tags || '',
+      new Date(u.createdAt).toLocaleDateString(),
+    ]));
+    const csv = '﻿' + rows.map((r) => r.map((c) => /[",;\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c).join(';')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `miz-students-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  const sortedList = list || [];
+  const allSelected = list && list.length > 0 && selected.size === list.length;
 
   return (
     <Shell title={t('nav.students')}>
-      <div className="fin-toolbar" style={{ marginBottom: 16 }}>
-        <input className="input" placeholder="🔍 Поиск по ФИО / логину / email / учителю" style={{ maxWidth: 360 }}
-          value={search} onChange={(e) => setSearch(e.target.value)} />
-        <select className="select" style={{ maxWidth: 200 }} value={filter} onChange={(e) => setFilter(e.target.value as StatusFilter)}>
-          <option value="ALL">Все ({list?.length ?? 0})</option>
-          <option value="active">Активные</option>
-          <option value="archived">Архив</option>
+      <div className="admin-toolbar">
+        <input className="input search" placeholder={t('admin.fin.search')} value={search} onChange={(e) => setSearch(e.target.value)} />
+        <select className="select" value={archived} onChange={(e) => setArchived(e.target.value)}>
+          <option value="all">{t('admin.filter.all')}</option>
+          <option value="active">{t('students.active')}</option>
+          <option value="archived">{t('students.archive')}</option>
         </select>
+        <select className="select" value={activity} onChange={(e) => setActivity(e.target.value)}>
+          <option value="any">{t('admin.filter.activityAny')}</option>
+          <option value="7d">{t('admin.filter.activity7d')}</option>
+          <option value="30d">{t('admin.filter.activity30d')}</option>
+          <option value="inactive7d">{t('admin.filter.inactive7d')}</option>
+        </select>
+        <select className="select" value={tag} onChange={(e) => setTag(e.target.value)}>
+          <option value="">{t('admin.filter.tagAny')}</option>
+          <option value="vip">#vip</option>
+          <option value="new">#new</option>
+          <option value="inactive">#inactive</option>
+          <option value="problem">#problem</option>
+          <option value="champion">#champion</option>
+        </select>
+        <div className="spacer" />
+        <button className="btn" onClick={exportSelected}>⬇ CSV</button>
       </div>
 
-      {!list && loading ? <SkeletonTable rows={6} cols={5} /> : (
+      {!list && loading ? <SkeletonTable rows={6} cols={6} /> : (
         <div className="card" style={{ padding: 0 }}>
           <table className="table">
-            <thead><tr><th>{t('students.fullName')}</th><th>{t('profile.login')}</th><th>{t('nav.teachers')}</th><th>{t('calendar.status')}</th><th></th></tr></thead>
+            <thead>
+              <tr>
+                <th className="row-check"><input type="checkbox" checked={!!allSelected} onChange={toggleAll} /></th>
+                <SortHeader field="name" label={t('students.fullName')} sort={sort} onSort={setSort} />
+                <th>{t('profile.login')}</th>
+                <th>{t('nav.teachers')}</th>
+                <SortHeader field="activity" label={t('admin.teacher.lastLogin')} sort={sort} onSort={setSort} />
+                <th>{t('calendar.status')}</th>
+                <th></th>
+              </tr>
+            </thead>
             <tbody>
-              {visible.map((s) => {
+              {sortedList.map((s: any) => {
                 const tags = (s.tags || '').split(',').filter(Boolean);
                 return (
                   <tr key={s.id}>
+                    <td className="row-check">
+                      <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggleOne(s.id)} />
+                    </td>
                     <td>
                       <Link to={`/admin/students/${s.id}`} style={{ fontWeight: 500 }}>{s.fullName}</Link>
                       {tags.length > 0 && (
@@ -102,20 +169,56 @@ export function AdminStudents() {
                         ? <Link to={`/admin/teachers/${s.studentProfile.teacher.id}`}>{s.studentProfile.teacher.fullName}</Link>
                         : '—'}
                     </td>
+                    <td className="muted" style={{ fontSize: 12 }}>{s.lastLoginAt ? new Date(s.lastLoginAt).toLocaleDateString() : '—'}</td>
                     <td>{s.archived ? <StatusBadge status="ARCHIVED" /> : <StatusBadge status="ACTIVE" label={t('students.active')} />}</td>
                     <td className="admin-row-actions">
                       <Link className="btn btn-sm" to={`/admin/students/${s.id}`}>{t('btn.open')}</Link>
-                      <button className="btn btn-sm btn-ghost" onClick={() => archive(s.id, s.archived)}>{s.archived ? t('btn.unarchive') : t('btn.archive')}</button>
-                      <button className="btn btn-sm btn-danger" onClick={() => remove(s.id)}>{t('btn.delete')}</button>
+                      {s.archived
+                        ? <button className="btn btn-sm btn-ghost" onClick={() => unarchive(s.id)}>{t('btn.unarchive')}</button>
+                        : <button className="btn btn-sm btn-ghost" onClick={() => setArchiveTarget(s)}>{t('btn.archive')}</button>}
+                      <button className="btn btn-sm btn-danger" onClick={() => setDeleteTarget(s)}>{t('btn.delete')}</button>
                     </td>
                   </tr>
                 );
               })}
-              {visible.length === 0 && <tr><td colSpan={5} className="empty">{search || filter !== 'ALL' ? t('empty.noFound') : t('empty.noStudents')}</td></tr>}
+              {sortedList.length === 0 && <tr><td colSpan={7} className="empty">{t('empty.noFound')}</td></tr>}
             </tbody>
           </table>
         </div>
       )}
+
+      <ArchiveReasonModal
+        open={!!archiveTarget}
+        danger
+        title={t('students.confirmArchive')}
+        body={archiveTarget ? `${archiveTarget.fullName} (${archiveTarget.login})` : ''}
+        okLabel={t('btn.archive')}
+        onCancel={() => setArchiveTarget(null)}
+        onConfirm={(reason) => archiveTarget && archiveOne(archiveTarget.id, reason)}
+      />
+      <ArchiveReasonModal
+        open={!!deleteTarget}
+        danger
+        title={t('students.confirmDelete')}
+        body={t('students.confirmDeleteBody')}
+        okLabel={t('btn.delete')}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={(reason) => deleteTarget && deleteOne(deleteTarget.id, reason)}
+      />
+      <ArchiveReasonModal
+        open={bulkArchiveOpen}
+        danger
+        title={t('admin.bulk.archiveTitle')}
+        body={`${t('admin.bulk.archiveBody')}: ${selected.size}`}
+        okLabel={t('btn.archive')}
+        onCancel={() => setBulkArchiveOpen(false)}
+        onConfirm={bulkArchive}
+      />
+
+      <BulkBar count={selected.size} onClear={() => setSelected(new Set())}>
+        <button className="btn btn-danger" onClick={() => setBulkArchiveOpen(true)}>{t('btn.archive')}</button>
+        <button className="btn" onClick={exportSelected}>⬇ CSV</button>
+      </BulkBar>
     </Shell>
   );
 }

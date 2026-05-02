@@ -10,7 +10,7 @@ export class AdminService {
   // ============================================================
   // Teachers
   // ============================================================
-  async listTeachers(opts: { search?: string; status?: string; archived?: string; sort?: string } = {}) {
+  async listTeachers(opts: { search?: string; status?: string; archived?: string; sort?: string; activity?: string; hasStudents?: string; hasCourses?: string; limit?: string; offset?: string } = {}) {
     const where: any = { role: 'TEACHER' };
     if (opts.archived === 'archived') where.archived = true;
     else if (opts.archived === 'active') where.archived = false;
@@ -28,19 +28,50 @@ export class AdminService {
     if (opts.status && ['TRIAL', 'ACTIVE', 'EXPIRED', 'BLOCKED', 'PAUSED', 'CANCELED'].includes(opts.status)) {
       where.teacherSubscription = { status: opts.status };
     }
+    if (opts.hasStudents === 'yes') where.teacherStudents = { some: {} };
+    else if (opts.hasStudents === 'no') where.teacherStudents = { none: {} };
+    if (opts.hasCourses === 'yes') where.teacherCourses = { some: {} };
+    else if (opts.hasCourses === 'no') where.teacherCourses = { none: {} };
+    // Activity filter — measured by lastLoginAt window
+    if (opts.activity === '7d') {
+      const cutoff = new Date(Date.now() - 7 * 86400000);
+      where.lastLoginAt = { gte: cutoff };
+    } else if (opts.activity === '30d') {
+      const cutoff = new Date(Date.now() - 30 * 86400000);
+      where.lastLoginAt = { gte: cutoff };
+    } else if (opts.activity === 'inactive7d') {
+      const cutoff = new Date(Date.now() - 7 * 86400000);
+      where.OR = [...(where.OR || []), { lastLoginAt: null }, { lastLoginAt: { lt: cutoff } }];
+    }
 
+    // Sort: `name`, `-name`, `created`, `-created`, `students`, `-students`, `courses`, `-courses`, `activity`, `-activity`
     let orderBy: any = { createdAt: 'desc' };
-    if (opts.sort === 'oldest') orderBy = { createdAt: 'asc' };
-    if (opts.sort === 'name') orderBy = { fullName: 'asc' };
+    const sort = opts.sort || '';
+    const desc = sort.startsWith('-');
+    const field = sort.replace(/^-/, '');
+    if (field === 'name') orderBy = { fullName: desc ? 'desc' : 'asc' };
+    else if (field === 'created') orderBy = { createdAt: desc ? 'desc' : 'asc' };
+    else if (field === 'activity') orderBy = { lastLoginAt: desc ? 'desc' : 'asc' };
+    else if (field === 'students') orderBy = { teacherStudents: { _count: desc ? 'desc' : 'asc' } };
+    else if (field === 'courses') orderBy = { teacherCourses: { _count: desc ? 'desc' : 'asc' } };
 
-    return this.prisma.user.findMany({
-      where,
-      include: {
-        teacherSubscription: true,
-        _count: { select: { teacherStudents: true, teacherCourses: true, teacherLessons: true } },
-      },
-      orderBy,
-    });
+    const take = opts.limit ? Math.min(500, Math.max(1, +opts.limit)) : undefined;
+    const skip = opts.offset ? Math.max(0, +opts.offset) : undefined;
+
+    const [items, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        include: {
+          teacherSubscription: true,
+          _count: { select: { teacherStudents: true, teacherCourses: true, teacherLessons: true } },
+        },
+        orderBy,
+        take, skip,
+      }),
+      take !== undefined ? this.prisma.user.count({ where }) : Promise.resolve(undefined),
+    ]);
+    if (take !== undefined) return { items, total };
+    return items;
   }
 
   async createTeacher(actorId: string, data: { fullName: string; login: string; password: string; email?: string; phone?: string; subscription?: any }) {
@@ -294,7 +325,7 @@ export class AdminService {
   // ============================================================
   // Students
   // ============================================================
-  async listStudents(opts: { search?: string; archived?: string; teacherId?: string; tag?: string } = {}) {
+  async listStudents(opts: { search?: string; archived?: string; teacherId?: string; tag?: string; sort?: string; activity?: string; limit?: string; offset?: string } = {}) {
     const where: any = { role: 'STUDENT' };
     if (opts.archived === 'archived') where.archived = true;
     else if (opts.archived === 'active') where.archived = false;
@@ -310,11 +341,36 @@ export class AdminService {
     if (opts.teacherId) {
       where.studentProfile = { teacherId: opts.teacherId };
     }
-    return this.prisma.user.findMany({
-      where,
-      include: { studentProfile: { include: { teacher: { select: { id: true, fullName: true, login: true } } } } },
-      orderBy: { createdAt: 'desc' },
-    });
+    if (opts.activity === '7d') {
+      where.lastLoginAt = { gte: new Date(Date.now() - 7 * 86400000) };
+    } else if (opts.activity === '30d') {
+      where.lastLoginAt = { gte: new Date(Date.now() - 30 * 86400000) };
+    } else if (opts.activity === 'inactive7d') {
+      where.OR = [...(where.OR || []), { lastLoginAt: null }, { lastLoginAt: { lt: new Date(Date.now() - 7 * 86400000) } }];
+    }
+
+    let orderBy: any = { createdAt: 'desc' };
+    const sort = opts.sort || '';
+    const desc = sort.startsWith('-');
+    const field = sort.replace(/^-/, '');
+    if (field === 'name') orderBy = { fullName: desc ? 'desc' : 'asc' };
+    else if (field === 'created') orderBy = { createdAt: desc ? 'desc' : 'asc' };
+    else if (field === 'activity') orderBy = { lastLoginAt: desc ? 'desc' : 'asc' };
+
+    const take = opts.limit ? Math.min(500, Math.max(1, +opts.limit)) : undefined;
+    const skip = opts.offset ? Math.max(0, +opts.offset) : undefined;
+
+    const [items, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        include: { studentProfile: { include: { teacher: { select: { id: true, fullName: true, login: true } } } } },
+        orderBy,
+        take, skip,
+      }),
+      take !== undefined ? this.prisma.user.count({ where }) : Promise.resolve(undefined),
+    ]);
+    if (take !== undefined) return { items, total };
+    return items;
   }
 
   async getStudentCard(studentUserId: string) {

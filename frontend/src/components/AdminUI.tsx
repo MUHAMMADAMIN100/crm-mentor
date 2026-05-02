@@ -96,3 +96,44 @@ export function ConfirmBanner({ message }: { message: string }) {
     </div>
   );
 }
+
+/**
+ * Floating action bar that appears at the bottom of the screen when bulk
+ * selection is active. Used by AdminTeachers / AdminStudents tables.
+ */
+export function BulkBar({
+  count, onClear, children,
+}: { count: number; onClear: () => void; children: ReactNode }) {
+  if (count === 0) return null;
+  return (
+    <div className="bulk-bar">
+      <span className="bulk-bar-count">{count}</span>
+      <button className="bulk-bar-clear" onClick={onClear} title="Снять выделение">×</button>
+      <div className="bulk-bar-actions">{children}</div>
+    </div>
+  );
+}
+
+/**
+ * Clickable column header that toggles sort direction.
+ * Pass `sort` (current sort key) and `onSort` (set new sort key).
+ * Convention: passing the same key flips direction (asc/desc).
+ */
+export function SortHeader({
+  field, label, sort, onSort,
+}: { field: string; label: string; sort: string; onSort: (next: string) => void }) {
+  const baseField = sort.replace(/^-/, '');
+  const isActive = baseField === field;
+  const isDesc = isActive && sort.startsWith('-');
+  function click() {
+    if (!isActive) onSort(field);             // first click: ascending
+    else if (!isDesc) onSort(`-${field}`);    // second click: descending
+    else onSort('');                          // third click: unsort
+  }
+  return (
+    <th onClick={click} className={`sort-header ${isActive ? 'is-active' : ''}`} role="button">
+      {label}
+      <span className="sort-arrow">{isActive ? (isDesc ? '↓' : '↑') : '↕'}</span>
+    </th>
+  );
+}
