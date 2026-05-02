@@ -17,6 +17,8 @@ export class AuthService {
       role: user.role,
       login: user.login,
     });
+    // Track last successful login for the admin dashboard's activity insights.
+    this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => {});
     return {
       token,
       user: this.sanitize(user),

@@ -420,6 +420,127 @@ main.content > .miz-loader {
   font-size: 11px;
   color: var(--text-muted);
 }
+.kpi-label-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.kpi-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+}
+
+.admin-section-title {
+  margin: 24px 0 12px;
+  font-size: 13px;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.admin-section-title:first-child { margin-top: 0; }
+
+/* ---------- Status badge ---------- */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+.status-badge.status-success { background: rgba(16, 185, 129, 0.12); color: var(--success); border-color: rgba(16, 185, 129, 0.25); }
+.status-badge.status-warning { background: rgba(234, 179, 8, 0.15); color: #b45309; border-color: rgba(234, 179, 8, 0.3); }
+.status-badge.status-danger  { background: rgba(239, 68, 68, 0.12); color: var(--danger); border-color: rgba(239, 68, 68, 0.25); }
+.status-badge.status-primary { background: var(--primary-50); color: var(--primary-700); border-color: var(--primary-200); }
+.status-badge.status-muted   { background: var(--surface-2); color: var(--text-muted); border-color: var(--border); }
+.status-badge.status-neutral { background: var(--surface-2); color: var(--text); border-color: var(--border); }
+
+/* ---------- Mini bars chart ---------- */
+.mini-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  width: 100%;
+  padding-top: 2px;
+}
+.mini-bars-col {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-width: 0;
+}
+.mini-bars-bar {
+  width: 100%;
+  border-radius: 3px 3px 0 0;
+  transition: opacity 0.15s;
+}
+.mini-bars-col:hover .mini-bars-bar { opacity: 0.7; }
+
+/* ---------- Admin tables / filters ---------- */
+.admin-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.admin-toolbar .input,
+.admin-toolbar .select {
+  height: 36px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.admin-toolbar .input.search { min-width: 240px; flex: 1 1 240px; max-width: 360px; }
+
+.admin-row-actions {
+  display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;
+}
+.admin-row-actions .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+/* Manager / staff card */
+.manager-perm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 6px 14px;
+  margin-top: 8px;
+}
+.manager-perm-grid label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* Audit feed */
+.audit-row {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.audit-row:last-child { border-bottom: none; }
+.audit-row .audit-action {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 11px;
+  color: var(--primary-700);
+  background: var(--primary-50);
+  padding: 2px 8px;
+  border-radius: 6px;
+  align-self: flex-start;
+  white-space: nowrap;
+}
+.audit-row .audit-target { color: var(--text-muted); font-size: 12px; }
+.audit-row .audit-time { color: var(--text-muted); font-size: 11px; margin-left: auto; white-space: nowrap; }
 
 /* ---------- Finance pro ---------- */
 .fin-stats {

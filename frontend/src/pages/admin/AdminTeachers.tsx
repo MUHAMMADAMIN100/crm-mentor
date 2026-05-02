@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Shell } from '../../components/Shell';
 import { api, invalidateApi, mutateCache } from '../../api';
 import { useApi } from '../../hooks';
@@ -6,6 +7,7 @@ import { Modal } from '../../components/Modal';
 import { SkeletonTable } from '../../components/Skeleton';
 import { toast, confirmDialog } from '../../store';
 import { useT } from '../../i18n';
+import { StatusBadge } from '../../components/AdminUI';
 
 type StatusFilter = 'ALL' | 'active' | 'archived' | 'TRIAL' | 'ACTIVE' | 'EXPIRED';
 
@@ -115,11 +117,18 @@ export function AdminTeachers() {
             <tbody>
               {(visible || []).map((tc: any) => (
                 <tr key={tc.id}>
-                  <td>{tc.fullName}</td>
+                  <td>
+                    <Link to={`/admin/teachers/${tc.id}`} style={{ fontWeight: 500 }}>{tc.fullName}</Link>
+                    {tc._count && <div className="muted" style={{ fontSize: 11 }}>{tc._count.teacherStudents} учеников · {tc._count.teacherCourses} курсов</div>}
+                  </td>
                   <td>{tc.login}</td>
-                  <td>{tc.teacherSubscription?.status || '—'} {tc.teacherSubscription?.endDate && <span className="muted"> · {t('course.untilDate')} {new Date(tc.teacherSubscription.endDate).toLocaleDateString()}</span>}</td>
-                  <td>{tc.archived ? <span className="badge badge-past">{t('students.archive')}</span> : <span className="badge badge-success">{t('students.active')}</span>}</td>
-                  <td className="flex" style={{ justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                  <td>
+                    {tc.teacherSubscription ? <StatusBadge status={tc.teacherSubscription.status} /> : '—'}
+                    {tc.teacherSubscription?.endDate && <div className="muted" style={{ fontSize: 11 }}>{t('course.untilDate')} {new Date(tc.teacherSubscription.endDate).toLocaleDateString()}</div>}
+                  </td>
+                  <td>{tc.archived ? <StatusBadge status="ARCHIVED" /> : <StatusBadge status="ACTIVE" label={t('students.active')} />}</td>
+                  <td className="admin-row-actions">
+                    <Link className="btn btn-sm" to={`/admin/teachers/${tc.id}`}>{t('btn.open')}</Link>
                     <button className="btn btn-sm" onClick={() => setSubOpen(tc)}>{t('teachers.subscription')}</button>
                     <button className="btn btn-sm btn-ghost" onClick={() => archive(tc.id, tc.archived)}>{tc.archived ? t('btn.unarchive') : t('btn.archive')}</button>
                     <button className="btn btn-sm btn-danger" onClick={() => remove(tc.id)}>{t('btn.delete')}</button>

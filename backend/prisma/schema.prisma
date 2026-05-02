@@ -27,11 +27,25 @@ enum SubscriptionStatus {
   ACTIVE
   EXPIRED
   BLOCKED
+  PAUSED
+  CANCELED
 }
 
 enum SubscriptionType {
   MONTH
   YEAR
+}
+
+// Sub-classification for ADMIN-role users.
+// SUPER_ADMIN — root, can do everything including managing other admins
+// ADMIN       — full ops access except managing super admins
+// SUPPORT     — can view + edit students/teachers, no finance/subscriptions
+// SALES       — can view + edit subscriptions and finance, can create teachers
+enum AdminLevel {
+  SUPER_ADMIN
+  ADMIN
+  SUPPORT
+  SALES
 }
 
 model User {
@@ -59,8 +73,16 @@ model User {
   bio              String?           // student: extra info
   avatarUrl        String?
   archived         Boolean  @default(false)
+  archiveReason    String?           // why this account was archived (admin-only)
   mustChangePassword Boolean @default(true)
   profileCompleted Boolean  @default(false)
+  lastLoginAt      DateTime?         // updated on each successful login
+  // Admin-only sub-classification (SUPER_ADMIN, ADMIN, SUPPORT, SALES).
+  adminLevel       AdminLevel?
+  // Comma-separated permission codes for fine-grained gating (admin only).
+  permissions      String?
+  // Free-form tags for student segmentation (e.g. "vip,new").
+  tags             String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -75,6 +97,10 @@ model User {
 
   // Student profile
   studentProfile   StudentProfile? @relation("StudentProfile")
+
+  // Admin / audit
+  auditActions     AuditLog[]       @relation("AuditActor")
+  subscriptionEdits SubscriptionHistory[] @relation("SubHistoryActor")
 
   // Common
   notes            Note[]
@@ -118,6 +144,65 @@ model Subscription {
   startDate DateTime?
   endDate   DateTime?
   amount    Float?
+  currency  String?           // optional currency code (RUB/USD/EUR/...)
+  source    String?           // who/how it was paid ("manual_admin", "stripe", "kassa")
+  comment   String?
+  updatedAt DateTime @updatedAt
+
+  history   SubscriptionHistory[]
+}
+
+// One-row-per-change history for a subscription. Lets the admin audit who
+// extended/blocked/changed price and when.
+model SubscriptionHistory {
+  id            String   @id @default(cuid())
+  subscriptionId String
+  subscription  Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  actorId       String?
+  actor         User?    @relation("SubHistoryActor", fields: [actorId], references: [id])
+  action        String   // "extend", "status_change", "create", "edit"
+  prevStatus    SubscriptionStatus?
+  nextStatus    SubscriptionStatus?
+  prevEndDate   DateTime?
+  nextEndDate   DateTime?
+  amount        Float?
+  comment       String?
+  createdAt     DateTime @default(now())
+
+  @@index([subscriptionId])
+  @@index([createdAt])
+}
+
+// Generic audit log for sensitive admin actions.
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  actor      User     @relation("AuditActor", fields: [actorId], references: [id], onDelete: Cascade)
+  action     String   // dot-namespaced verb e.g. "teacher.archive", "manager.create", "subscription.extend"
+  targetType String?  // "User" | "Subscription" | "Course" | etc.
+  targetId   String?
+  meta       Json?    // optional context payload
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}
+
+// Key-value store for platform-wide settings.
+model SystemSetting {
+  key       String   @id    // "platform.name", "default.lang", "default.currency", etc.
+  value     String           // JSON-encoded string
+  updatedAt DateTime @updatedAt
+}
+
+// Templates for system notifications shown across roles.
+model NotificationTemplate {
+  id        String   @id @default(cuid())
+  code      String   @unique  // "trial_ending", "subscription_expired", "welcome", etc.
+  title     String
+  body      String
+  enabled   Boolean  @default(true)
   updatedAt DateTime @updatedAt
 }
 

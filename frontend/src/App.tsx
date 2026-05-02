@@ -14,12 +14,15 @@ import { Loading } from './components/Loading';
 
 import { AdminHome } from './pages/admin/AdminHome';
 import { AdminTeachers } from './pages/admin/AdminTeachers';
+import { AdminTeacherCard } from './pages/admin/AdminTeacherCard';
 import { AdminStudents } from './pages/admin/AdminStudents';
 import { AdminCourses } from './pages/admin/AdminCourses';
 import { AdminFinance } from './pages/admin/AdminFinance';
+import { AdminSubscriptions } from './pages/admin/AdminSubscriptions';
 import { AdminAnalytics } from './pages/admin/AdminAnalytics';
 import { AdminSystem } from './pages/admin/AdminSystem';
 import { AdminManagers } from './pages/admin/AdminManagers';
+import { AdminAudit } from './pages/admin/AdminAudit';
 
 import { TeacherHome } from './pages/teacher/TeacherHome';
 import { TeacherCalendar } from './pages/teacher/TeacherCalendar';
@@ -94,10 +97,13 @@ export default function App() {
       <Route path="/admin" element={<Protected roles={['ADMIN']}><AdminHome /></Protected>} />
       <Route path="/admin/managers" element={<Protected roles={['ADMIN']}><AdminManagers /></Protected>} />
       <Route path="/admin/teachers" element={<Protected roles={['ADMIN']}><AdminTeachers /></Protected>} />
+      <Route path="/admin/teachers/:id" element={<Protected roles={['ADMIN']}><AdminTeacherCard /></Protected>} />
       <Route path="/admin/students" element={<Protected roles={['ADMIN']}><AdminStudents /></Protected>} />
       <Route path="/admin/courses" element={<Protected roles={['ADMIN']}><AdminCourses /></Protected>} />
       <Route path="/admin/finance" element={<Protected roles={['ADMIN']}><AdminFinance /></Protected>} />
+      <Route path="/admin/subscriptions" element={<Protected roles={['ADMIN']}><AdminSubscriptions /></Protected>} />
       <Route path="/admin/analytics" element={<Protected roles={['ADMIN']}><AdminAnalytics /></Protected>} />
+      <Route path="/admin/audit" element={<Protected roles={['ADMIN']}><AdminAudit /></Protected>} />
       <Route path="/admin/system" element={<Protected roles={['ADMIN']}><AdminSystem /></Protected>} />
 
       {/* Teacher */}

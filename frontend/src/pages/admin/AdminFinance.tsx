@@ -1,15 +1,18 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Shell } from '../../components/Shell';
 import { useApi } from '../../hooks';
 import { Loading } from '../../components/Loading';
+import { Kpi, StatusBadge } from '../../components/AdminUI';
 import { useT } from '../../i18n';
 
-type Status = 'ALL' | 'TRIAL' | 'ACTIVE' | 'EXPIRED' | 'BLOCKED';
+type Status = 'ALL' | 'TRIAL' | 'ACTIVE' | 'EXPIRED' | 'BLOCKED' | 'PAUSED' | 'CANCELED';
 type Sort = 'recent' | 'amountDesc' | 'amountAsc' | 'expiringSoon';
 
 export function AdminFinance() {
   const { t } = useT();
-  const { data, loading } = useApi<any>('/admin/finance');
+  const [period, setPeriod] = useState('30d');
+  const { data, loading } = useApi<any>(`/admin/finance?period=${period}`);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<Status>('ALL');
   const [sort, setSort] = useState<Sort>('recent');
@@ -71,30 +74,39 @@ export function AdminFinance() {
     <Shell title={t('finance.title')}>
       {/* KPIs */}
       <div className="kpi-grid">
-        <Kpi label="Общая выручка" value={`${(data.totalRevenue || 0).toLocaleString()} ₽`} accent="primary" />
-        <Kpi label="MRR (активные)" value={`${(data.activeRevenue || 0).toLocaleString()} ₽`} accent="success" />
-        <Kpi label="Активные" value={data.counts?.ACTIVE || 0} accent="success" />
-        <Kpi label="Trial" value={data.counts?.TRIAL || 0} accent="warning" />
-        <Kpi label="Просроченные" value={data.counts?.EXPIRED || 0} accent="danger" />
-        <Kpi label="Заблокированы" value={data.counts?.BLOCKED || 0} accent="muted" />
+        <Kpi label={t('admin.fin.totalRevenue')} value={`${(data.totalRevenue || 0).toLocaleString()} ₽`} accent="primary" />
+        <Kpi label={t('admin.fin.mrr')} value={`${Math.round(data.mrr || 0).toLocaleString()} ₽`} accent="success" hint={t('admin.fin.mrrHint')} />
+        <Kpi label={t('admin.fin.arpu')} value={`${Math.round(data.arpu || 0).toLocaleString()} ₽`} accent="primary" hint={t('admin.fin.arpuHint')} />
+        <Kpi label={t('admin.fin.churn')} value={`${Math.round((data.churnRate || 0) * 100)}%`} accent="danger" hint={t('admin.fin.churnHint')} />
+        <Kpi label={t('admin.fin.periodRevenue')} value={`${(data.periodRevenue || 0).toLocaleString()} ₽`} accent="primary" />
+        <Kpi label={t('admin.fin.active')} value={data.counts?.ACTIVE || 0} accent="success" />
+        <Kpi label={t('admin.fin.trial')} value={data.counts?.TRIAL || 0} accent="warning" />
+        <Kpi label={t('admin.fin.expired')} value={data.counts?.EXPIRED || 0} accent="danger" />
       </div>
 
       {/* Toolbar */}
       <div className="fin-toolbar" style={{ marginTop: 16 }}>
-        <input className="input" placeholder="🔍 Поиск по ФИО / логину / email" style={{ maxWidth: 320 }}
+        <input className="input" placeholder={t('admin.fin.search')} style={{ maxWidth: 320 }}
           value={search} onChange={(e) => setSearch(e.target.value)} />
         <select className="select" style={{ maxWidth: 160 }} value={status} onChange={(e) => setStatus(e.target.value as Status)}>
-          <option value="ALL">Все статусы</option>
-          <option value="ACTIVE">Активная</option>
-          <option value="TRIAL">Пробный</option>
-          <option value="EXPIRED">Истёкшая</option>
-          <option value="BLOCKED">Заблокирована</option>
+          <option value="ALL">{t('admin.sub.allStatuses')}</option>
+          <option value="ACTIVE">ACTIVE</option>
+          <option value="TRIAL">TRIAL</option>
+          <option value="EXPIRED">EXPIRED</option>
+          <option value="BLOCKED">BLOCKED</option>
+          <option value="PAUSED">PAUSED</option>
+          <option value="CANCELED">CANCELED</option>
         </select>
         <select className="select" style={{ maxWidth: 200 }} value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
-          <option value="recent">Недавно изменённые</option>
-          <option value="amountDesc">Сумма ↓</option>
-          <option value="amountAsc">Сумма ↑</option>
-          <option value="expiringSoon">Скоро закончатся</option>
+          <option value="recent">{t('admin.fin.sortRecent')}</option>
+          <option value="amountDesc">{t('admin.fin.sortAmountDesc')}</option>
+          <option value="amountAsc">{t('admin.fin.sortAmountAsc')}</option>
+          <option value="expiringSoon">{t('admin.fin.sortExpiring')}</option>
+        </select>
+        <select className="select" style={{ maxWidth: 140 }} value={period} onChange={(e) => setPeriod(e.target.value)}>
+          <option value="7d">7 дн.</option>
+          <option value="30d">30 дн.</option>
+          <option value="90d">90 дн.</option>
         </select>
         <div className="spacer" />
         <button className="btn" onClick={exportCsv}>⬇ CSV</button>
@@ -120,12 +132,12 @@ export function AdminFinance() {
               return (
                 <tr key={s.id}>
                   <td>
-                    <div style={{ fontWeight: 500 }}>{s.teacher?.fullName || '—'}</div>
+                    <Link to={`/admin/teachers/${s.teacher?.id || s.teacherId}`}>{s.teacher?.fullName || '—'}</Link>
                     <div className="muted" style={{ fontSize: 11 }}>{s.teacher?.login}{s.teacher?.archived && ' · архив'}</div>
                   </td>
-                  <td><span className={`badge badge-${badgeForStatus(s.status, isExpired)}`}>{statusLabel(s.status)}</span></td>
+                  <td><StatusBadge status={s.status} /></td>
                   <td>{s.type || '—'}</td>
-                  <td>{s.amount ? `${s.amount.toLocaleString()} ₽` : '—'}</td>
+                  <td>{s.amount ? `${s.amount.toLocaleString()} ${s.currency || '₽'}` : '—'}</td>
                   <td style={{ color: isExpired ? 'var(--danger)' : expSoon ? '#b45309' : undefined }}>
                     {s.endDate ? new Date(s.endDate).toLocaleDateString() : '—'}
                   </td>
@@ -143,32 +155,3 @@ export function AdminFinance() {
   );
 }
 
-function Kpi({ label, value, accent }: any) {
-  const color =
-    accent === 'success' ? 'var(--success)'
-      : accent === 'warning' ? '#b45309'
-      : accent === 'danger' ? 'var(--danger)'
-      : accent === 'muted' ? 'var(--text-muted)'
-      : 'var(--primary)';
-  return (
-    <div className="card kpi-card">
-      <div className="kpi-label">{label}</div>
-      <div className="kpi-value" style={{ color }}>{value}</div>
-    </div>
-  );
-}
-
-function statusLabel(s: string) {
-  return ({
-    ACTIVE: 'Активная',
-    TRIAL: 'Trial',
-    EXPIRED: 'Истёкшая',
-    BLOCKED: 'Заблокирована',
-  } as any)[s] || s;
-}
-function badgeForStatus(s: string, expired: boolean) {
-  if (expired || s === 'EXPIRED') return 'danger';
-  if (s === 'ACTIVE') return 'success';
-  if (s === 'TRIAL') return 'warning';
-  return 'past';
-}
