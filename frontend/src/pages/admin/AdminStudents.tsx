@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Shell } from '../../components/Shell';
 import { api, invalidateApi, mutateCache } from '../../api';
 import { useApi } from '../../hooks';
 import { SkeletonTable } from '../../components/Skeleton';
 import { toast, confirmDialog } from '../../store';
 import { useT } from '../../i18n';
+import { StatusBadge } from '../../components/AdminUI';
 
 type StatusFilter = 'ALL' | 'active' | 'archived';
 
@@ -82,18 +84,33 @@ export function AdminStudents() {
           <table className="table">
             <thead><tr><th>{t('students.fullName')}</th><th>{t('profile.login')}</th><th>{t('nav.teachers')}</th><th>{t('calendar.status')}</th><th></th></tr></thead>
             <tbody>
-              {visible.map((s) => (
-                <tr key={s.id}>
-                  <td>{s.fullName}</td>
-                  <td>{s.login}</td>
-                  <td>{s.studentProfile?.teacher?.fullName || '—'}</td>
-                  <td>{s.archived ? <span className="badge badge-past">{t('students.archive')}</span> : <span className="badge badge-success">{t('students.active')}</span>}</td>
-                  <td className="flex" style={{ justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                    <button className="btn btn-sm btn-ghost" onClick={() => archive(s.id, s.archived)}>{s.archived ? t('btn.unarchive') : t('btn.archive')}</button>
-                    <button className="btn btn-sm btn-danger" onClick={() => remove(s.id)}>{t('btn.delete')}</button>
-                  </td>
-                </tr>
-              ))}
+              {visible.map((s) => {
+                const tags = (s.tags || '').split(',').filter(Boolean);
+                return (
+                  <tr key={s.id}>
+                    <td>
+                      <Link to={`/admin/students/${s.id}`} style={{ fontWeight: 500 }}>{s.fullName}</Link>
+                      {tags.length > 0 && (
+                        <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          {tags.map((t: string) => <span key={t} className="status-badge status-primary" style={{ fontSize: 9, padding: '1px 6px' }}>#{t}</span>)}
+                        </div>
+                      )}
+                    </td>
+                    <td>{s.login}</td>
+                    <td>
+                      {s.studentProfile?.teacher
+                        ? <Link to={`/admin/teachers/${s.studentProfile.teacher.id}`}>{s.studentProfile.teacher.fullName}</Link>
+                        : '—'}
+                    </td>
+                    <td>{s.archived ? <StatusBadge status="ARCHIVED" /> : <StatusBadge status="ACTIVE" label={t('students.active')} />}</td>
+                    <td className="admin-row-actions">
+                      <Link className="btn btn-sm" to={`/admin/students/${s.id}`}>{t('btn.open')}</Link>
+                      <button className="btn btn-sm btn-ghost" onClick={() => archive(s.id, s.archived)}>{s.archived ? t('btn.unarchive') : t('btn.archive')}</button>
+                      <button className="btn btn-sm btn-danger" onClick={() => remove(s.id)}>{t('btn.delete')}</button>
+                    </td>
+                  </tr>
+                );
+              })}
               {visible.length === 0 && <tr><td colSpan={5} className="empty">{search || filter !== 'ALL' ? t('empty.noFound') : t('empty.noStudents')}</td></tr>}
             </tbody>
           </table>

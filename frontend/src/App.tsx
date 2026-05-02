@@ -16,7 +16,9 @@ import { AdminHome } from './pages/admin/AdminHome';
 import { AdminTeachers } from './pages/admin/AdminTeachers';
 import { AdminTeacherCard } from './pages/admin/AdminTeacherCard';
 import { AdminStudents } from './pages/admin/AdminStudents';
+import { AdminStudentCard } from './pages/admin/AdminStudentCard';
 import { AdminCourses } from './pages/admin/AdminCourses';
+import { AdminCourseCard } from './pages/admin/AdminCourseCard';
 import { AdminFinance } from './pages/admin/AdminFinance';
 import { AdminSubscriptions } from './pages/admin/AdminSubscriptions';
 import { AdminAnalytics } from './pages/admin/AdminAnalytics';
@@ -99,7 +101,9 @@ export default function App() {
       <Route path="/admin/teachers" element={<Protected roles={['ADMIN']}><AdminTeachers /></Protected>} />
       <Route path="/admin/teachers/:id" element={<Protected roles={['ADMIN']}><AdminTeacherCard /></Protected>} />
       <Route path="/admin/students" element={<Protected roles={['ADMIN']}><AdminStudents /></Protected>} />
+      <Route path="/admin/students/:id" element={<Protected roles={['ADMIN']}><AdminStudentCard /></Protected>} />
       <Route path="/admin/courses" element={<Protected roles={['ADMIN']}><AdminCourses /></Protected>} />
+      <Route path="/admin/courses/:id" element={<Protected roles={['ADMIN']}><AdminCourseCard /></Protected>} />
       <Route path="/admin/finance" element={<Protected roles={['ADMIN']}><AdminFinance /></Protected>} />
       <Route path="/admin/subscriptions" element={<Protected roles={['ADMIN']}><AdminSubscriptions /></Protected>} />
       <Route path="/admin/analytics" element={<Protected roles={['ADMIN']}><AdminAnalytics /></Protected>} />

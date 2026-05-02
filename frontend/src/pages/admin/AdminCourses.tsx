@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Shell } from '../../components/Shell';
 import { useApi } from '../../hooks';
 import { SkeletonTable } from '../../components/Skeleton';
 import { useT } from '../../i18n';
+import { StatusBadge } from '../../components/AdminUI';
 
 export function AdminCourses() {
   const { t } = useT();
@@ -46,11 +48,13 @@ export function AdminCourses() {
               {visible.map((c: any) => (
                 <tr key={c.id}>
                   <td>
-                    <div style={{ fontWeight: 500 }}>{c.title}</div>
+                    <Link to={`/admin/courses/${c.id}`} style={{ fontWeight: 500 }}>{c.title}</Link>
                     {c.category && <div className="muted" style={{ fontSize: 11 }}>{c.category}</div>}
                   </td>
-                  <td>{c.teacher?.fullName}</td>
-                  <td><span className="badge badge-neutral">{c.status}</span></td>
+                  <td>{c.teacher
+                    ? <Link to={`/admin/teachers/${c.teacher.id}`}>{c.teacher.fullName}</Link>
+                    : '—'}</td>
+                  <td><StatusBadge status={c.status} /></td>
                   <td>{c._count?.modules}</td><td>{c._count?.accesses}</td>
                 </tr>
               ))}
