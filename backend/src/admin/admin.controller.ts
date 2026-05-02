@@ -94,7 +94,7 @@ export class AdminController {
   @Get('finance') finance(@Query() q: any) {
     return this.svc.finance({ search: q.search, status: q.status, period: q.period, source: q.source, managerId: q.managerId });
   }
-  @Get('analytics') analytics(@Query() q: any) { return this.svc.analytics({ period: q.period }); }
+  @Get('analytics') analytics(@Query() q: any) { return this.svc.analytics({ period: q.period, from: q.from, to: q.to }); }
   @Get('dashboard') dashboard() { return this.svc.dashboard(); }
 
   // ----- Managers -----

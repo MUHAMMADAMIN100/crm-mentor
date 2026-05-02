@@ -601,10 +601,23 @@ export class AdminService {
   // ============================================================
   // Analytics
   // ============================================================
-  async analytics(opts: { period?: string } = {}) {
+  async analytics(opts: { period?: string; from?: string; to?: string } = {}) {
     const now = new Date();
-    const periodDays = opts.period === '7d' ? 7 : opts.period === '90d' ? 90 : opts.period === 'all' ? 3650 : 30;
-    const cutoff = new Date(now.getTime() - periodDays * 86400000);
+    let cutoff: Date;
+    let periodEnd = now;
+    if (opts.from && opts.to) {
+      cutoff = new Date(opts.from);
+      periodEnd = new Date(opts.to);
+    } else {
+      const periodDays = opts.period === 'today' ? 1
+        : opts.period === '7d' ? 7
+        : opts.period === '30d' ? 30
+        : opts.period === '90d' ? 90
+        : opts.period === 'quarter' ? 90
+        : opts.period === 'all' ? 3650
+        : 30;
+      cutoff = new Date(now.getTime() - periodDays * 86400000);
+    }
 
     const [
       teachersTotal, teachersActive, teachersArchived,
@@ -615,6 +628,15 @@ export class AdminService {
       subsActive, subsTrial, subsExpired,
       teacherRegistrationsByDay,
       revenueByDay,
+      // DAU / WAU / MAU based on lastLoginAt
+      dauUsers,
+      wauUsers,
+      mauUsers,
+      // Trial→Paid conversion
+      trialHistory,
+      paidHistory,
+      // Average check (active subs that have an amount)
+      paidSubsForAvg,
     ] = await Promise.all([
       this.prisma.user.count({ where: { role: 'TEACHER' } }),
       this.prisma.user.count({ where: { role: 'TEACHER', archived: false } }),
@@ -623,52 +645,84 @@ export class AdminService {
       this.prisma.user.count({ where: { role: 'STUDENT', archived: false } }),
       this.prisma.user.count({ where: { role: 'STUDENT', archived: true } }),
       this.prisma.course.count(),
-      this.prisma.lesson.count({ where: { status: 'COMPLETED', startAt: { gte: cutoff } } }),
-      this.prisma.lesson.count({ where: { startAt: { gte: cutoff } } }),
-      this.prisma.homeworkSubmission.count({ where: { status: 'COMPLETED', updatedAt: { gte: cutoff } } }),
-      this.prisma.homeworkSubmission.count({ where: { updatedAt: { gte: cutoff } } }),
+      this.prisma.lesson.count({ where: { status: 'COMPLETED', startAt: { gte: cutoff, lte: periodEnd } } }),
+      this.prisma.lesson.count({ where: { startAt: { gte: cutoff, lte: periodEnd } } }),
+      this.prisma.homeworkSubmission.count({ where: { status: 'COMPLETED', updatedAt: { gte: cutoff, lte: periodEnd } } }),
+      this.prisma.homeworkSubmission.count({ where: { updatedAt: { gte: cutoff, lte: periodEnd } } }),
       this.prisma.subscription.count({ where: { status: 'ACTIVE' } }),
       this.prisma.subscription.count({ where: { status: 'TRIAL' } }),
       this.prisma.subscription.count({ where: { status: 'EXPIRED' } }),
       this.prisma.user.findMany({
-        where: { role: 'TEACHER', createdAt: { gte: cutoff } },
-        select: { createdAt: true },
+        where: { createdAt: { gte: cutoff, lte: periodEnd } },
+        select: { createdAt: true, role: true },
       }),
       this.prisma.subscription.findMany({
-        where: { startDate: { gte: cutoff } },
+        where: { startDate: { gte: cutoff, lte: periodEnd } },
         select: { startDate: true, amount: true },
+      }),
+      this.prisma.user.count({ where: { lastLoginAt: { gte: new Date(now.getTime() - 86400000) } } }),
+      this.prisma.user.count({ where: { lastLoginAt: { gte: new Date(now.getTime() - 7 * 86400000) } } }),
+      this.prisma.user.count({ where: { lastLoginAt: { gte: new Date(now.getTime() - 30 * 86400000) } } }),
+      this.prisma.subscriptionHistory.findMany({
+        where: { createdAt: { gte: cutoff, lte: periodEnd }, prevStatus: 'TRIAL' },
+        select: { id: true, prevStatus: true, nextStatus: true },
+      }),
+      this.prisma.subscriptionHistory.findMany({
+        where: { createdAt: { gte: cutoff, lte: periodEnd }, prevStatus: 'TRIAL', nextStatus: 'ACTIVE' },
+        select: { id: true },
+      }),
+      this.prisma.subscription.findMany({
+        where: { status: 'ACTIVE', amount: { not: null } },
+        select: { amount: true, type: true },
       }),
     ]);
 
-    // Group by day
-    const teacherSeries = bucketByDay(teacherRegistrationsByDay.map((x) => ({ date: x.createdAt, value: 1 })));
-    const revenueSeries = bucketByDay(revenueByDay.map((x) => ({ date: x.startDate as Date, value: x.amount || 0 })));
+    // Group by day, split by role
+    const teacherSeries = bucketByDay(teacherRegistrationsByDay.filter((x: any) => x.role === 'TEACHER').map((x: any) => ({ date: x.createdAt, value: 1 })));
+    const studentSeries = bucketByDay(teacherRegistrationsByDay.filter((x: any) => x.role === 'STUDENT').map((x: any) => ({ date: x.createdAt, value: 1 })));
+    const revenueSeries = bucketByDay(revenueByDay.map((x: any) => ({ date: x.startDate as Date, value: x.amount || 0 })));
+
+    // Trial → Paid conversion = paid / total trial-changes-to-anything within period
+    const trialConversion = trialHistory.length > 0 ? paidHistory.length / trialHistory.length : 0;
+
+    // Average check — for monthly equivalence: yearly subs / 12
+    const monthlyAmounts = paidSubsForAvg.map((s: any) => (s.amount || 0) / (s.type === 'YEAR' ? 12 : 1));
+    const avgCheck = monthlyAmounts.length > 0 ? monthlyAmounts.reduce((s, x) => s + x, 0) / monthlyAmounts.length : 0;
 
     // Operational metrics from audit log
     const auditStats = await this.prisma.auditLog.groupBy({
       by: ['action'],
-      where: { createdAt: { gte: cutoff } },
+      where: { createdAt: { gte: cutoff, lte: periodEnd } },
       _count: { _all: true },
       orderBy: { _count: { action: 'desc' } },
-      take: 20,
+      take: 30,
     });
 
     return {
+      period: { from: cutoff.toISOString(), to: periodEnd.toISOString() },
       business: {
         teachersTotal, teachersActive, teachersArchived,
         studentsTotal, studentsActive, studentsArchived,
         subsActive, subsTrial, subsExpired,
         coursesTotal,
         teacherSeries,
+        studentSeries,
         revenueSeries,
+        trialConversion,
+        avgCheck,
       },
       product: {
         lessonsCompleted, lessonsTotal,
         homeworkDone, homeworkTotal,
         completionRate: lessonsTotal > 0 ? lessonsCompleted / lessonsTotal : 0,
+        dau: dauUsers,
+        wau: wauUsers,
+        mau: mauUsers,
+        // Stickiness — how often the average WAU user shows up daily
+        stickiness: wauUsers > 0 ? dauUsers / wauUsers : 0,
       },
       ops: {
-        auditStats: auditStats.map((x) => ({ action: x.action, count: x._count._all })),
+        auditStats: auditStats.map((x: any) => ({ action: x.action, count: x._count._all })),
       },
     };
   }
