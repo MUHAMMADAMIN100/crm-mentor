@@ -27,20 +27,66 @@ export class AiContextService {
   }
 
   private async adminCtx() {
-    const [teachersCount, studentsCount, coursesCount, subs, lessonsCompleted, hwDone, hwOverdue] = await Promise.all([
+    const now = new Date();
+    const ago7d = new Date(now.getTime() - 7 * 86400000);
+    const ago30d = new Date(now.getTime() - 30 * 86400000);
+    const in7d = new Date(now.getTime() + 7 * 86400000);
+
+    const [teachersCount, studentsCount, coursesCount, subs, lessonsCompleted, hwDone, hwOverdue, teachersNoStudents, teachersNoCourses] = await Promise.all([
       this.prisma.user.count({ where: { role: 'TEACHER', archived: false } }),
       this.prisma.user.count({ where: { role: 'STUDENT', archived: false } }),
       this.prisma.course.count(),
-      this.prisma.subscription.findMany(),
+      this.prisma.subscription.findMany({ include: { teacher: { select: { id: true, fullName: true, login: true } } } }),
       this.prisma.lesson.count({ where: { status: 'COMPLETED' } }),
       this.prisma.homeworkSubmission.count({ where: { status: 'COMPLETED' } }),
       this.prisma.homeworkSubmission.count({ where: { status: 'OVERDUE' } }),
+      this.prisma.user.findMany({
+        where: { role: 'TEACHER', archived: false, teacherStudents: { none: {} } },
+        select: { id: true, fullName: true, login: true, createdAt: true },
+        take: 20,
+      }),
+      this.prisma.user.findMany({
+        where: { role: 'TEACHER', archived: false, teacherCourses: { none: {} } },
+        select: { id: true, fullName: true, login: true, createdAt: true },
+        take: 20,
+      }),
     ]);
-    const teachers = await this.prisma.user.findMany({ where: { role: 'TEACHER' } });
+    const activeTeacherIdsRaw = await this.prisma.lesson.findMany({
+      where: { startAt: { gte: ago7d } },
+      distinct: ['teacherId'],
+      select: { teacherId: true },
+    });
+    const activeIds = new Set(activeTeacherIdsRaw.map((x: any) => x.teacherId));
+    const allActiveTeachers = await this.prisma.user.findMany({
+      where: { role: 'TEACHER', archived: false },
+      select: { id: true, fullName: true, login: true, lastLoginAt: true, createdAt: true },
+    });
+    const inactiveTeachers = allActiveTeachers.filter((t: any) => !activeIds.has(t.id)).slice(0, 30);
+
+    const expiringSoon = subs.filter((s: any) => s.status === 'ACTIVE' && s.endDate && +new Date(s.endDate) >= +now && +new Date(s.endDate) <= +in7d);
+    const expired = subs.filter((s: any) => s.status === 'EXPIRED' || (s.status === 'ACTIVE' && s.endDate && +new Date(s.endDate) < +now));
+    const activeSubs = subs.filter((s: any) => s.status === 'ACTIVE');
     const revenue = subs.reduce((s: number, x: any) => s + (x.amount || 0), 0);
-    const expiringSoon = subs.filter(
-      (s: any) => s.endDate && new Date(s.endDate).getTime() - Date.now() < 7 * 86400000,
-    );
+    const mrr = activeSubs.reduce((sum: number, x: any) => sum + ((x.amount || 0) / (x.type === 'YEAR' ? 12 : 1)), 0);
+    const churned30d = subs.filter((s: any) => (s.status === 'EXPIRED' || s.status === 'CANCELED') && +s.updatedAt >= +ago30d).length;
+    const churnRate = activeSubs.length + churned30d > 0 ? churned30d / (activeSubs.length + churned30d) : 0;
+
+    // Risk score per teacher = mix of: subscription expiring soon, no recent activity, no students, expired sub.
+    const riskList = allActiveTeachers.map((t: any) => {
+      const sub = subs.find((s: any) => s.teacherId === t.id);
+      const isInactive = !activeIds.has(t.id);
+      const subExpiring = sub && sub.status === 'ACTIVE' && sub.endDate && +new Date(sub.endDate) - +now < 7 * 86400000;
+      const subExpired = sub && (sub.status === 'EXPIRED' || (sub.endDate && +new Date(sub.endDate) < +now));
+      const noStudents = teachersNoStudents.find((x: any) => x.id === t.id);
+      let score = 0;
+      const reasons: string[] = [];
+      if (subExpired) { score += 50; reasons.push('подписка истекла'); }
+      else if (subExpiring) { score += 30; reasons.push('подписка скоро истечёт'); }
+      if (isInactive) { score += 25; reasons.push('нет активности 7+ дней'); }
+      if (noStudents) { score += 15; reasons.push('нет учеников'); }
+      return { id: t.id, fullName: t.fullName, login: t.login, score, reasons };
+    }).filter((x: any) => x.score >= 25).sort((a: any, b: any) => b.score - a.score).slice(0, 15);
+
     return {
       summary: {
         teachers: teachersCount,
@@ -50,16 +96,18 @@ export class AiContextService {
         homeworkDone: hwDone,
         homeworkOverdue: hwOverdue,
         totalRevenue: revenue,
+        mrr: Math.round(mrr),
+        activeSubs: activeSubs.length,
+        churnRate30d: Math.round(churnRate * 100),
       },
-      teachers: teachers.map((t: any) => ({
-        id: t.id,
-        fullName: t.fullName,
-        login: t.login,
-        email: t.email,
-        archived: t.archived,
-        currency: t.teacherCurrency,
-      })),
-      subscriptionsExpiringIn7d: expiringSoon,
+      attention: {
+        subscriptionsExpiringIn7d: expiringSoon.map((s: any) => ({ teacher: s.teacher?.fullName, login: s.teacher?.login, endDate: s.endDate })),
+        subscriptionsExpired: expired.map((s: any) => ({ teacher: s.teacher?.fullName, login: s.teacher?.login, endDate: s.endDate })),
+        teachersNoStudents: teachersNoStudents.map((t: any) => ({ fullName: t.fullName, login: t.login })),
+        teachersNoCourses: teachersNoCourses.map((t: any) => ({ fullName: t.fullName, login: t.login })),
+        inactiveTeachers7d: inactiveTeachers.map((t: any) => ({ fullName: t.fullName, login: t.login, lastLoginAt: t.lastLoginAt })),
+        riskList,
+      },
     };
   }
 

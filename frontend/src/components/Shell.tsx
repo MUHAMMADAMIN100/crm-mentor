@@ -28,7 +28,7 @@ function prefetchRoute(to: string) {
   if (fn) { try { fn(); } catch {} }
 }
 
-interface NavItem { to: string; labelKey: any; ai?: boolean; icon?: ReactNode; }
+interface NavItem { to: string; labelKey: any; ai?: boolean; icon?: ReactNode; requires?: string[]; superOnly?: boolean; }
 
 const Icon = {
   home: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>,
@@ -47,15 +47,15 @@ const Icon = {
 const NAV: Record<string, NavItem[]> = {
   ADMIN: [
     { to: '/admin', labelKey: 'nav.home', icon: Icon.home },
-    { to: '/admin/managers', labelKey: 'nav.managers', icon: Icon.shield },
+    { to: '/admin/managers', labelKey: 'nav.managers', icon: Icon.shield, requires: ['manage_managers'], superOnly: true },
     { to: '/admin/teachers', labelKey: 'nav.teachers', icon: Icon.users },
     { to: '/admin/students', labelKey: 'nav.students', icon: Icon.users },
     { to: '/admin/courses', labelKey: 'nav.courses', icon: Icon.book },
-    { to: '/admin/subscriptions', labelKey: 'nav.subscriptions', icon: Icon.fin },
-    { to: '/admin/finance', labelKey: 'nav.finance', icon: Icon.fin },
-    { to: '/admin/analytics', labelKey: 'nav.analytics', icon: Icon.chart },
+    { to: '/admin/subscriptions', labelKey: 'nav.subscriptions', icon: Icon.fin, requires: ['manage_subscriptions'] },
+    { to: '/admin/finance', labelKey: 'nav.finance', icon: Icon.fin, requires: ['manage_finance'] },
+    { to: '/admin/analytics', labelKey: 'nav.analytics', icon: Icon.chart, requires: ['view_analytics'] },
     { to: '/admin/audit', labelKey: 'nav.audit', icon: Icon.cog },
-    { to: '/admin/system', labelKey: 'nav.system', icon: Icon.cog },
+    { to: '/admin/system', labelKey: 'nav.system', icon: Icon.cog, requires: ['manage_system'], superOnly: true },
     { to: '/ai', labelKey: 'nav.ai', ai: true },
   ],
   TEACHER: [
@@ -112,7 +112,22 @@ export function Shell({ title, children, showBack }: { title: string; children: 
   }, [menuOpen]);
 
   if (!user) return null;
-  const items = NAV[user.role] || [];
+  const rawItems = NAV[user.role] || [];
+  // Filter admin nav by adminLevel + permissions. SUPER_ADMIN always sees
+  // everything; lower levels see entries whose requirements they meet.
+  const adminLevel = (user as any).adminLevel as string | undefined;
+  const perms = ((user as any).permissions || '').split(',').filter(Boolean);
+  const items = user.role === 'ADMIN' && adminLevel && adminLevel !== 'SUPER_ADMIN'
+    ? rawItems.filter((i) => {
+        if (i.superOnly && adminLevel !== 'SUPER_ADMIN') {
+          // ADMIN sub-role can still see super-only entries if they have the perm.
+          if (adminLevel === 'ADMIN' && i.requires && i.requires.every((p) => perms.includes(p))) return true;
+          return false;
+        }
+        if (!i.requires) return true;
+        return i.requires.every((p) => perms.includes(p));
+      })
+    : rawItems;
 
   // Determine if "Back" button should be shown:
   // explicit prop wins, otherwise show on any non-root path that's not home of user role.
