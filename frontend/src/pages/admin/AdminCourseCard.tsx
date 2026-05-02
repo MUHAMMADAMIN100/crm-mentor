@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Shell } from '../../components/Shell';
 import { Loading } from '../../components/Loading';
@@ -12,9 +13,21 @@ export function AdminCourseCard() {
   const { id } = useParams();
   const nav = useNavigate();
   const { data, refetch } = useApi<any>(`/admin/courses/${id}`);
+  const { data: progress } = useApi<any>(id ? `/admin/courses/${id}/progress` : '');
+  const { data: settings } = useApi<any>('/admin/system/settings');
+  let formats: string[] = ['online', 'offline', 'hybrid', 'mixed'];
+  try { if (settings && typeof settings['ref.courseFormats'] === 'string') formats = JSON.parse(settings['ref.courseFormats']); } catch {}
+  const [formatEdit, setFormatEdit] = useState<string | null>(null);
 
   if (!data) return <Shell title={t('admin.course.cardTitle')}><Loading label={t('loader.course')} /></Shell>;
   const c = data;
+
+  function saveFormat(value: string) {
+    setFormatEdit(null);
+    api.patch(`/admin/courses/${c.id}/format`, { format: value })
+      .then(() => { invalidateApi('/admin/courses'); refetch(); toast.success(t('admin.system.saved')); })
+      .catch(() => toast.error(t('toast.error')));
+  }
 
   async function setStatus(status: string) {
     if (status === 'ARCHIVED') {
@@ -70,6 +83,7 @@ export function AdminCourseCard() {
         <Kpi label={t('admin.course.lessons')} value={totalLessons} />
         <Kpi label={t('admin.course.blocks')} value={totalBlocks} />
         <Kpi label={t('admin.course.accesses')} value={(c.accesses || []).length} accent="success" />
+        <Kpi label={t('admin.course.avgProgress')} value={progress ? `${progress.avgPercent || 0}%` : '—'} accent="primary" hint={t('admin.course.avgProgressHint')} />
       </div>
 
       <div className="cards-grid" style={{ marginTop: 16 }}>
@@ -77,6 +91,25 @@ export function AdminCourseCard() {
           <h3>{t('admin.course.info')}</h3>
           <ProfRow label={t('admin.course.teacher')} value={c.teacher ? <Link to={`/admin/teachers/${c.teacher.id}`}>{c.teacher.fullName}</Link> : '—'} />
           <ProfRow label={t('admin.course.status')} value={<StatusBadge status={c.status} />} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+            <span className="muted" style={{ fontSize: 12 }}>{t('admin.course.format')}</span>
+            <span style={{ textAlign: 'right' }}>
+              {formatEdit !== null ? (
+                <select className="select" autoFocus
+                  value={formatEdit} onChange={(e) => setFormatEdit(e.target.value)}
+                  onBlur={() => saveFormat(formatEdit)}
+                  style={{ minWidth: 140 }}>
+                  <option value="">—</option>
+                  {formats.map((f) => <option key={f} value={f}>{f}</option>)}
+                </select>
+              ) : (
+                <button onClick={() => setFormatEdit(c.format || '')}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'underline dotted', color: 'inherit', padding: 0 }}>
+                  {c.format || '—'}
+                </button>
+              )}
+            </span>
+          </div>
           <ProfRow label={t('admin.teacher.createdAt')} value={new Date(c.createdAt).toLocaleDateString()} />
           {c.category && <ProfRow label={t('profile.category')} value={c.category} />}
         </div>
@@ -96,6 +129,34 @@ export function AdminCourseCard() {
             {(c.accesses || []).length === 0 && <div className="empty">—</div>}
           </div>
         </div>
+
+        {progress && progress.students && progress.students.length > 0 && (
+          <div className="card" style={{ gridColumn: 'span 2' }}>
+            <h3>{t('admin.course.studentProgress')} · {t('admin.course.avgProgress')}: {progress.avgPercent || 0}%</h3>
+            <div style={{ maxHeight: 360, overflowY: 'auto' }}>
+              <table className="table">
+                <thead><tr><th>{t('profile.fullName')}</th><th>{t('admin.course.progress')}</th><th>{t('admin.course.completed')}</th></tr></thead>
+                <tbody>
+                  {progress.students.map((s: any) => (
+                    <tr key={s.studentId}>
+                      <td>
+                        <Link to={`/admin/students/${s.studentId}`}>{s.fullName}</Link>
+                        <div className="muted" style={{ fontSize: 11 }}>{s.login}</div>
+                      </td>
+                      <td>
+                        <div style={{ width: '100%', minWidth: 140, background: 'var(--surface-2)', borderRadius: 999, height: 8, overflow: 'hidden' }}>
+                          <div style={{ width: `${s.percent}%`, height: '100%', background: s.percent >= 80 ? 'var(--success)' : s.percent >= 30 ? 'var(--primary)' : '#b45309' }} />
+                        </div>
+                        <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>{s.percent}%</div>
+                      </td>
+                      <td className="muted" style={{ fontSize: 12 }}>{s.done} / {s.total}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         <div className="card" style={{ gridColumn: 'span 2' }}>
           <h3>{t('admin.course.structure')}</h3>

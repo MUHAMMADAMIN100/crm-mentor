@@ -71,6 +71,8 @@ export function AdminTeacherCard() {
         <Kpi label={t('admin.teacher.lessonsTotal')} value={u._count.teacherLessons} />
         <Kpi label={t('admin.teacher.lessonsCompleted')} value={stats.lessonsCompleted} accent="success" />
         <Kpi label={t('admin.teacher.lessonsPlanned')} value={stats.lessonsPlanned} accent="primary" />
+        <Kpi label={t('admin.teacher.studentIncoming')} value={`${(stats.studentIncoming || 0).toLocaleString()} ₽`} accent="success" hint={t('admin.teacher.studentIncomingHint')} />
+        <Kpi label={t('admin.teacher.studentCharged')} value={`${(stats.studentCharged || 0).toLocaleString()} ₽`} accent="primary" hint={t('admin.teacher.studentChargedHint')} />
       </div>
 
       <div className="cards-grid" style={{ marginTop: 16 }}>
@@ -175,6 +177,24 @@ export function AdminTeacherCard() {
               </div>
             ))}
             {data.recentLessons.length === 0 && <div className="empty">—</div>}
+          </div>
+        </div>
+
+        <div className="card">
+          <h3>{t('admin.teacher.studentPayments')}</h3>
+          <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+            {(data.recentStudentPayments || []).map((p: any) => (
+              <div key={p.id} className="list-item">
+                <div>
+                  <div style={{ fontWeight: 500, color: p.kind === 'TOPUP' ? 'var(--success)' : 'var(--danger)' }}>
+                    {p.kind === 'TOPUP' ? '+' : '−'}{(p.amount || 0).toLocaleString()} ₽
+                  </div>
+                  <div className="muted" style={{ fontSize: 11 }}>{p.student?.user?.fullName || '—'} {p.comment ? `· ${p.comment}` : ''}</div>
+                </div>
+                <div className="muted" style={{ fontSize: 11 }}>{new Date(p.createdAt).toLocaleString()}</div>
+              </div>
+            ))}
+            {(!data.recentStudentPayments || data.recentStudentPayments.length === 0) && <div className="empty">—</div>}
           </div>
         </div>
 

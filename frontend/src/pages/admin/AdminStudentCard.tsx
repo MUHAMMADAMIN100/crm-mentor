@@ -61,7 +61,10 @@ export function AdminStudentCard() {
       <div className="kpi-grid">
         <Kpi label={t('admin.student.balance')} value={`${(sp?.balance || 0).toLocaleString()} ₽`} accent={sp?.balance < 0 ? 'danger' : 'primary'} />
         <Kpi label={t('admin.student.lessonsCount')} value={stats.lessonsCount} />
-        <Kpi label={t('admin.student.homeworkDone')} value={stats.completedHomework} accent="success" />
+        <Kpi label={t('admin.student.attendance')} value={`${stats.attendance || 0}%`} accent="success" hint={t('admin.student.attendanceHint')} />
+        <Kpi label={t('admin.student.hwCompletion')} value={`${stats.hwCompletion || 0}%`} accent="primary" hint={t('admin.student.hwCompletionHint')} />
+        <Kpi label={t('admin.student.hwOverdue')} value={stats.hwOverdue || 0} accent={stats.hwOverdue > 0 ? 'danger' : 'muted'} />
+        <Kpi label={t('admin.student.avgQuiz')} value={`${stats.avgQuizScore || 0}%`} accent="primary" hint={t('admin.student.avgQuizHint')} />
         <Kpi label={t('admin.student.coursesCount')} value={sp?.courseAccesses?.length || 0} />
         <Kpi label={t('admin.student.groupsCount')} value={sp?.groups?.length || 0} />
       </div>
@@ -121,6 +124,36 @@ export function AdminStudentCard() {
             ))}
             {(sp?.payments || []).length === 0 && <div className="empty">—</div>}
           </div>
+        </div>
+
+        <div className="card" style={{ gridColumn: 'span 2' }}>
+          <h3>{t('admin.student.chatsAndMessages')}</h3>
+          {(data.chats || []).length === 0 ? (
+            <div className="empty">{t('admin.student.noChats')}</div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                {(data.chats || []).map((c: any) => {
+                  const other = c.members?.find((m: any) => m.user?.id !== u.id);
+                  const title = c.title || other?.user?.fullName || (c.type === 'SUPPORT' ? 'Support' : 'Чат');
+                  return <span key={c.id} className="status-badge status-primary">{title}</span>;
+                })}
+              </div>
+              <h4 style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--text-soft)', textTransform: 'uppercase' }}>{t('admin.student.recentMessages')}</h4>
+              <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+                {(data.recentMessages || []).map((m: any) => (
+                  <div key={m.id} style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>{m.sender?.fullName || '—'} {m.sender?.role && <span className="muted">[{m.sender.role}]</span>}</span>
+                      <span>{new Date(m.createdAt).toLocaleString()}</span>
+                    </div>
+                    <div style={{ fontSize: 13, marginTop: 2, wordBreak: 'break-word' }}>{m.text || (m.kind || '—')}</div>
+                  </div>
+                ))}
+                {(!data.recentMessages || data.recentMessages.length === 0) && <div className="empty">—</div>}
+              </div>
+            </>
+          )}
         </div>
 
         <div className="card" style={{ gridColumn: 'span 2' }}>
