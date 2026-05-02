@@ -20,6 +20,7 @@ const DEFAULT_SETTINGS: Record<string, string> = {
   'ref.teacherCategories': JSON.stringify(['math', 'english', 'physics', 'chemistry', 'music', 'programming', 'design', 'business']),
   'ref.studentTags': JSON.stringify(['vip', 'new', 'inactive', 'problem', 'champion']),
   'ref.paymentSources': JSON.stringify(['manual_admin', 'card', 'invoice', 'crypto', 'cash', 'transfer']),
+  'ref.courseFormats': JSON.stringify(['online', 'offline', 'hybrid', 'mixed', 'self_paced']),
   // Security settings
   'security.minPasswordLength': '6',
   'security.lockoutOnFailedAttempts': 'false',

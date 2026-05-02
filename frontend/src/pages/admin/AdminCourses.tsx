@@ -1,51 +1,69 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Shell } from '../../components/Shell';
 import { useApi } from '../../hooks';
 import { SkeletonTable } from '../../components/Skeleton';
 import { useT } from '../../i18n';
-import { StatusBadge } from '../../components/AdminUI';
+import { StatusBadge, SortHeader, Paginator } from '../../components/AdminUI';
 
 export function AdminCourses() {
   const { t } = useT();
-  const { data: list, loading } = useApi<any[]>('/admin/courses');
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<'ALL' | 'DRAFT' | 'PUBLISHED_PRIVATE' | 'ARCHIVED'>('ALL');
+  const [status, setStatus] = useState('all');
+  const [format, setFormat] = useState('all');
+  const [sort, setSort] = useState('-created');
+  const [offset, setOffset] = useState(0);
+  const limit = 50;
 
-  const visible = useMemo(() => {
-    if (!list) return [];
-    let v = list.slice();
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      v = v.filter((c: any) =>
-        (c.title || '').toLowerCase().includes(q) ||
-        (c.category || '').toLowerCase().includes(q) ||
-        (c.teacher?.fullName || '').toLowerCase().includes(q),
-      );
-    }
-    if (status !== 'ALL') v = v.filter((c: any) => c.status === status);
-    return v;
-  }, [list, search, status]);
+  const url = `/admin/courses?${new URLSearchParams({
+    ...(search ? { search } : {}),
+    ...(status !== 'all' ? { status } : {}),
+    ...(format !== 'all' ? { format } : {}),
+    ...(sort ? { sort } : {}),
+    limit: String(limit),
+    offset: String(offset),
+  }).toString()}`;
+  const { data: response, loading } = useApi<any>(url);
+  const list: any[] = response?.items || [];
+  const total: number = response?.total || 0;
+
+  // Pull format reference from system settings (initial values seeded by SystemService).
+  const { data: settings } = useApi<any>('/admin/system/settings');
+  let formats: string[] = ['online', 'offline', 'hybrid', 'mixed'];
+  try { if (settings && typeof (settings as any)['ref.courseFormats'] === 'string') formats = JSON.parse((settings as any)['ref.courseFormats']); } catch {}
 
   return (
     <Shell title={t('nav.courses')}>
-      <div className="fin-toolbar" style={{ marginBottom: 16 }}>
-        <input className="input" placeholder="🔍 Поиск по названию / категории / учителю" style={{ maxWidth: 360 }}
-          value={search} onChange={(e) => setSearch(e.target.value)} />
-        <select className="select" style={{ maxWidth: 220 }} value={status} onChange={(e) => setStatus(e.target.value as any)}>
-          <option value="ALL">Все ({list?.length ?? 0})</option>
-          <option value="DRAFT">Черновики</option>
-          <option value="PUBLISHED_PRIVATE">Опубликованы</option>
-          <option value="ARCHIVED">Архив</option>
+      <div className="admin-toolbar">
+        <input className="input search" placeholder={t('admin.fin.search')} value={search} onChange={(e) => setSearch(e.target.value)} />
+        <select className="select" value={status} onChange={(e) => { setStatus(e.target.value); setOffset(0); }}>
+          <option value="all">{t('admin.filter.all')}</option>
+          <option value="DRAFT">DRAFT</option>
+          <option value="PUBLISHED_PRIVATE">PUBLISHED</option>
+          <option value="ARCHIVED">ARCHIVED</option>
+        </select>
+        <select className="select" value={format} onChange={(e) => { setFormat(e.target.value); setOffset(0); }}>
+          <option value="all">{t('admin.course.formatAny')}</option>
+          {formats.map((f) => <option key={f} value={f}>{f}</option>)}
         </select>
       </div>
 
-      {!list && loading ? <SkeletonTable rows={5} cols={5} /> : (
+      {!response && loading ? <SkeletonTable rows={5} cols={6} /> : (
         <div className="card" style={{ padding: 0 }}>
           <table className="table">
-            <thead><tr><th>{t('course.title2')}</th><th>{t('nav.teachers')}</th><th>{t('course.status')}</th><th>{t('course.modules')}</th><th>{t('course.studentsCount')}</th></tr></thead>
+            <thead>
+              <tr>
+                <SortHeader field="title" label={t('course.title2')} sort={sort} onSort={setSort} />
+                <th>{t('nav.teachers')}</th>
+                <th>{t('admin.course.format')}</th>
+                <th>{t('course.status')}</th>
+                <SortHeader field="modules" label={t('admin.course.modules')} sort={sort} onSort={setSort} />
+                <SortHeader field="students" label={t('course.studentsCount')} sort={sort} onSort={setSort} />
+                <SortHeader field="updated" label={t('admin.fin.col.updated')} sort={sort} onSort={setSort} />
+              </tr>
+            </thead>
             <tbody>
-              {visible.map((c: any) => (
+              {list.map((c: any) => (
                 <tr key={c.id}>
                   <td>
                     <Link to={`/admin/courses/${c.id}`} style={{ fontWeight: 500 }}>{c.title}</Link>
@@ -54,16 +72,20 @@ export function AdminCourses() {
                   <td>{c.teacher
                     ? <Link to={`/admin/teachers/${c.teacher.id}`}>{c.teacher.fullName}</Link>
                     : '—'}</td>
+                  <td className="muted" style={{ fontSize: 12 }}>{c.format || '—'}</td>
                   <td>
                     <StatusBadge status={c.status} />
                     {c.hidden && <span className="status-badge status-muted" style={{ marginLeft: 4 }}>{t('admin.course.hidden')}</span>}
                   </td>
-                  <td>{c._count?.modules}</td><td>{c._count?.accesses}</td>
+                  <td>{c._count?.modules}</td>
+                  <td>{c._count?.accesses}</td>
+                  <td className="muted" style={{ fontSize: 12 }}>{new Date(c.updatedAt).toLocaleDateString()}</td>
                 </tr>
               ))}
-              {visible.length === 0 && <tr><td colSpan={5} className="empty">{search || status !== 'ALL' ? t('empty.noFound') : t('empty.noCourses')}</td></tr>}
+              {list.length === 0 && <tr><td colSpan={7} className="empty">{search || status !== 'all' ? t('empty.noFound') : t('empty.noCourses')}</td></tr>}
             </tbody>
           </table>
+          <Paginator total={total} limit={limit} offset={offset} onChange={setOffset} />
         </div>
       )}
     </Shell>

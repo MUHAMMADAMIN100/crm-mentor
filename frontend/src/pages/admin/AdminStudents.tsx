@@ -17,6 +17,7 @@ export function AdminStudents() {
   const [activity, setActivity] = useState('any');
   const [tag, setTag] = useState('');
   const [sort, setSort] = useState('-created');
+  const [teacherId, setTeacherId] = useState('');
   const [offset, setOffset] = useState(0);
   const limit = 50;
 
@@ -25,6 +26,7 @@ export function AdminStudents() {
     ...(archived !== 'all' ? { archived } : {}),
     ...(activity !== 'any' ? { activity } : {}),
     ...(tag ? { tag } : {}),
+    ...(teacherId ? { teacherId } : {}),
     ...(sort ? { sort } : {}),
     limit: String(limit),
     offset: String(offset),
@@ -32,7 +34,7 @@ export function AdminStudents() {
   const { data: response, loading, refetch } = useApi<any>(url);
   const list: any[] = response?.items || [];
   const total: number = response?.total || 0;
-  const { data: teachers } = useApi<any[]>('/admin/teachers');
+  const { data: teachers } = useApi<any>('/admin/teachers');
   const teachersList: any[] = Array.isArray(teachers) ? teachers : (teachers as any)?.items || [];
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -91,27 +93,40 @@ export function AdminStudents() {
     } catch { toast.error(t('toast.error')); }
   }
 
-  function exportSelected() {
-    if (!list) return;
+  function rowsForExport() {
+    if (!list) return [];
     const items = selected.size > 0 ? list.filter((u: any) => selected.has(u.id)) : list;
-    const rows: string[][] = [];
-    rows.push(['ФИО', 'Логин', 'Email', 'Телефон', 'Учитель', 'Теги', 'Создан']);
-    items.forEach((u: any) => rows.push([
-      u.fullName || '',
-      u.login || '',
-      u.email || '',
-      u.phone || '',
-      u.studentProfile?.teacher?.fullName || '',
-      u.tags || '',
-      new Date(u.createdAt).toLocaleDateString(),
-    ]));
-    const csv = '﻿' + rows.map((r) => r.map((c) => /[",;\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c).join(';')).join('\n');
+    return items.map((u: any) => ({
+      ФИО: u.fullName || '',
+      Логин: u.login || '',
+      Email: u.email || '',
+      Телефон: u.phone || '',
+      Учитель: u.studentProfile?.teacher?.fullName || '',
+      Теги: u.tags || '',
+      Создан: new Date(u.createdAt).toLocaleDateString(),
+    }));
+  }
+  function exportSelected() {
+    const rows = rowsForExport();
+    if (rows.length === 0) return;
+    const headers = Object.keys(rows[0]);
+    const csv = '﻿' + [headers, ...rows.map((r: any) => headers.map((h) => r[h]))]
+      .map((r: any[]) => r.map((c) => /[",;\n]/.test(String(c)) ? `"${String(c).replace(/"/g, '""')}"` : String(c)).join(';')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `miz-students-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
+  }
+  async function exportXlsx() {
+    const rows = rowsForExport();
+    if (rows.length === 0) return;
+    const xlsx = await import('xlsx');
+    const ws = xlsx.utils.json_to_sheet(rows);
+    const wb = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(wb, ws, 'Students');
+    xlsx.writeFile(wb, `miz-students-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
   const sortedList = list;
@@ -132,7 +147,7 @@ export function AdminStudents() {
           <option value="30d">{t('admin.filter.activity30d')}</option>
           <option value="inactive7d">{t('admin.filter.inactive7d')}</option>
         </select>
-        <select className="select" value={tag} onChange={(e) => setTag(e.target.value)}>
+        <select className="select" value={tag} onChange={(e) => { setTag(e.target.value); setOffset(0); }}>
           <option value="">{t('admin.filter.tagAny')}</option>
           <option value="vip">#vip</option>
           <option value="new">#new</option>
@@ -140,8 +155,13 @@ export function AdminStudents() {
           <option value="problem">#problem</option>
           <option value="champion">#champion</option>
         </select>
+        <select className="select" value={teacherId} onChange={(e) => { setTeacherId(e.target.value); setOffset(0); }}>
+          <option value="">{t('admin.filter.teacherAny')}</option>
+          {teachersList.map((tt: any) => <option key={tt.id} value={tt.id}>{tt.fullName}</option>)}
+        </select>
         <div className="spacer" />
         <button className="btn" onClick={exportSelected}>⬇ CSV</button>
+        <button className="btn" onClick={exportXlsx}>⬇ XLSX</button>
         <button className="btn" onClick={() => setImportOpen(true)}>⬆ {t('admin.import.import')}</button>
       </div>
 

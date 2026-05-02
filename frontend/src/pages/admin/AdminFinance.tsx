@@ -3,29 +3,34 @@ import { Link } from 'react-router-dom';
 import { Shell } from '../../components/Shell';
 import { useApi } from '../../hooks';
 import { Loading } from '../../components/Loading';
-import { Kpi, StatusBadge } from '../../components/AdminUI';
+import { Kpi, StatusBadge, SortHeader, Paginator } from '../../components/AdminUI';
 import { useT } from '../../i18n';
-
-type Status = 'ALL' | 'TRIAL' | 'ACTIVE' | 'EXPIRED' | 'BLOCKED' | 'PAUSED' | 'CANCELED';
-type Sort = 'recent' | 'amountDesc' | 'amountAsc' | 'expiringSoon';
 
 export function AdminFinance() {
   const { t } = useT();
   const [period, setPeriod] = useState('30d');
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<Status>('ALL');
+  const [status, setStatus] = useState('all');
   const [source, setSource] = useState('all');
   const [managerId, setManagerId] = useState('all');
-  const [sort, setSort] = useState<Sort>('recent');
+  const [subType, setSubType] = useState('all');
+  const [sort, setSort] = useState('-updated');
+  const [offset, setOffset] = useState(0);
+  const limit = 50;
 
   const url = `/admin/finance?${new URLSearchParams({
     period,
-    ...(status !== 'ALL' ? { status } : {}),
+    ...(status !== 'all' ? { status } : {}),
     ...(source !== 'all' ? { source } : {}),
     ...(managerId !== 'all' ? { managerId } : {}),
+    ...(subType !== 'all' ? { subType } : {}),
+    ...(sort ? { sort } : {}),
+    limit: String(limit),
+    offset: String(offset),
   }).toString()}`;
   const { data, loading } = useApi<any>(url);
-  const { data: managers } = useApi<any[]>('/admin/managers');
+  const { data: managersResp } = useApi<any>('/admin/managers');
+  const managers: any[] = Array.isArray(managersResp) ? managersResp : managersResp?.items || [];
 
   const subs = useMemo(() => {
     if (!data?.subscriptions) return [];
@@ -38,18 +43,9 @@ export function AdminFinance() {
         (s.teacher?.email || '').toLowerCase().includes(q),
       );
     }
-    if (sort === 'amountDesc') list.sort((a: any, b: any) => (b.amount || 0) - (a.amount || 0));
-    else if (sort === 'amountAsc') list.sort((a: any, b: any) => (a.amount || 0) - (b.amount || 0));
-    else if (sort === 'expiringSoon') list.sort((a: any, b: any) => {
-      const ax = a.endDate ? +new Date(a.endDate) : Infinity;
-      const bx = b.endDate ? +new Date(b.endDate) : Infinity;
-      return ax - bx;
-    });
-    else list.sort((a: any, b: any) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
     return list;
-  }, [data, search, sort]);
+  }, [data, search]);
 
-  // Build the unique source list from current data so the filter reflects reality.
   const knownSources = useMemo(() => {
     const set = new Set<string>();
     (data?.subscriptions || []).forEach((s: any) => { if (s.source) set.add(s.source); });
@@ -105,7 +101,6 @@ export function AdminFinance() {
 
   return (
     <Shell title={t('finance.title')}>
-      {/* KPIs */}
       <div className="kpi-grid">
         <Kpi label={t('admin.fin.totalRevenue')} value={`${(data.totalRevenue || 0).toLocaleString()} ₽`} accent="primary" />
         <Kpi label={t('admin.fin.mrr')} value={`${Math.round(data.mrr || 0).toLocaleString()} ₽`} accent="success" hint={t('admin.fin.mrrHint')} />
@@ -117,11 +112,10 @@ export function AdminFinance() {
         <Kpi label={t('admin.fin.expired')} value={data.counts?.EXPIRED || 0} accent="danger" />
       </div>
 
-      {/* Toolbar */}
       <div className="admin-toolbar" style={{ marginTop: 16 }}>
         <input className="input search" placeholder={t('admin.fin.search')} value={search} onChange={(e) => setSearch(e.target.value)} />
-        <select className="select" value={status} onChange={(e) => setStatus(e.target.value as Status)}>
-          <option value="ALL">{t('admin.sub.allStatuses')}</option>
+        <select className="select" value={status} onChange={(e) => { setStatus(e.target.value); setOffset(0); }}>
+          <option value="all">{t('admin.sub.allStatuses')}</option>
           <option value="ACTIVE">ACTIVE</option>
           <option value="TRIAL">TRIAL</option>
           <option value="EXPIRED">EXPIRED</option>
@@ -129,19 +123,18 @@ export function AdminFinance() {
           <option value="PAUSED">PAUSED</option>
           <option value="CANCELED">CANCELED</option>
         </select>
-        <select className="select" value={source} onChange={(e) => setSource(e.target.value)}>
+        <select className="select" value={subType} onChange={(e) => { setSubType(e.target.value); setOffset(0); }}>
+          <option value="all">{t('admin.fin.typeAny')}</option>
+          <option value="MONTH">{t('teachers.month')}</option>
+          <option value="YEAR">{t('teachers.year')}</option>
+        </select>
+        <select className="select" value={source} onChange={(e) => { setSource(e.target.value); setOffset(0); }}>
           <option value="all">{t('admin.fin.sourceAny')}</option>
           {knownSources.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
-        <select className="select" value={managerId} onChange={(e) => setManagerId(e.target.value)}>
+        <select className="select" value={managerId} onChange={(e) => { setManagerId(e.target.value); setOffset(0); }}>
           <option value="all">{t('admin.fin.managerAny')}</option>
-          {(managers || []).map((m: any) => <option key={m.id} value={m.id}>{m.fullName}</option>)}
-        </select>
-        <select className="select" value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
-          <option value="recent">{t('admin.fin.sortRecent')}</option>
-          <option value="amountDesc">{t('admin.fin.sortAmountDesc')}</option>
-          <option value="amountAsc">{t('admin.fin.sortAmountAsc')}</option>
-          <option value="expiringSoon">{t('admin.fin.sortExpiring')}</option>
+          {managers.map((m: any) => <option key={m.id} value={m.id}>{m.fullName}</option>)}
         </select>
         <select className="select" value={period} onChange={(e) => setPeriod(e.target.value)} style={{ maxWidth: 120 }}>
           <option value="7d">7 дн.</option>
@@ -153,20 +146,19 @@ export function AdminFinance() {
         <button className="btn" onClick={exportXlsx}>⬇ XLSX</button>
       </div>
 
-      {/* Table */}
       <div className="card" style={{ padding: 0, marginTop: 12 }}>
         <table className="table">
           <thead>
             <tr>
               <th>{t('admin.fin.col.teacher')}</th>
-              <th>{t('admin.fin.col.status')}</th>
+              <SortHeader field="status" label={t('admin.fin.col.status')} sort={sort} onSort={setSort} />
               <th>{t('admin.fin.col.type')}</th>
-              <th>{t('admin.fin.col.amount')}</th>
+              <SortHeader field="amount" label={t('admin.fin.col.amount')} sort={sort} onSort={setSort} />
               <th>{t('admin.fin.col.source')}</th>
               <th>{t('admin.fin.col.comment')}</th>
               <th>{t('admin.fin.col.actor')}</th>
-              <th>{t('admin.fin.col.until')}</th>
-              <th>{t('admin.fin.col.updated')}</th>
+              <SortHeader field="endDate" label={t('admin.fin.col.until')} sort={sort} onSort={setSort} />
+              <SortHeader field="updated" label={t('admin.fin.col.updated')} sort={sort} onSort={setSort} />
             </tr>
           </thead>
           <tbody>
@@ -200,6 +192,7 @@ export function AdminFinance() {
             )}
           </tbody>
         </table>
+        <Paginator total={data.total || 0} limit={limit} offset={offset} onChange={setOffset} />
       </div>
     </Shell>
   );

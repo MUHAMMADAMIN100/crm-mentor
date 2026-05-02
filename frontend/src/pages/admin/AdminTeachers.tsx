@@ -19,6 +19,9 @@ export function AdminTeachers() {
   const [activity, setActivity] = useState('any');
   const [hasStudents, setHasStudents] = useState('any');
   const [hasCourses, setHasCourses] = useState('any');
+  const [subType, setSubType] = useState('all');
+  const [subEndFrom, setSubEndFrom] = useState('');
+  const [subEndTo, setSubEndTo] = useState('');
   const [sort, setSort] = useState('-created');
   const [offset, setOffset] = useState(0);
   const limit = 50;
@@ -27,6 +30,9 @@ export function AdminTeachers() {
     ...(search ? { search } : {}),
     ...(archived !== 'all' ? { archived } : {}),
     ...(status !== 'all' ? { status } : {}),
+    ...(subType !== 'all' ? { subType } : {}),
+    ...(subEndFrom ? { subEndFrom } : {}),
+    ...(subEndTo ? { subEndTo } : {}),
     ...(activity !== 'any' ? { activity } : {}),
     ...(hasStudents !== 'any' ? { hasStudents } : {}),
     ...(hasCourses !== 'any' ? { hasCourses } : {}),
@@ -44,6 +50,8 @@ export function AdminTeachers() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [archiveTarget, setArchiveTarget] = useState<any>(null);
   const [bulkArchiveOpen, setBulkArchiveOpen] = useState(false);
+  const [bulkExtendOpen, setBulkExtendOpen] = useState(false);
+  const [bulkStatusOpen, setBulkStatusOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
 
   function toggleAll() {
@@ -95,31 +103,47 @@ export function AdminTeachers() {
     } catch { toast.error(t('toast.error')); }
   }
 
-  function exportSelected() {
-    if (!list) return;
+  function rowsForExport() {
+    if (!list) return [];
     const items = selected.size > 0 ? list.filter((u: any) => selected.has(u.id)) : list;
-    const rows: string[][] = [];
-    rows.push(['ФИО', 'Логин', 'Email', 'Телефон', 'Telegram', 'Подписка', 'Окончание', 'Учеников', 'Курсов', 'Уроков', 'Создан']);
-    items.forEach((u: any) => rows.push([
-      u.fullName || '',
-      u.login || '',
-      u.email || '',
-      u.phone || '',
-      u.telegram || '',
-      u.teacherSubscription?.status || '',
-      u.teacherSubscription?.endDate ? new Date(u.teacherSubscription.endDate).toLocaleDateString() : '',
-      String(u._count?.teacherStudents || 0),
-      String(u._count?.teacherCourses || 0),
-      String(u._count?.teacherLessons || 0),
-      new Date(u.createdAt).toLocaleDateString(),
-    ]));
-    const csv = '﻿' + rows.map((r) => r.map((c) => /[",;\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c).join(';')).join('\n');
+    return items.map((u: any) => ({
+      ФИО: u.fullName || '',
+      Логин: u.login || '',
+      Email: u.email || '',
+      Телефон: u.phone || '',
+      Telegram: u.telegram || '',
+      Подписка: u.teacherSubscription?.status || '',
+      Тариф: u.teacherSubscription?.type || '',
+      Сумма: u.teacherSubscription?.amount || 0,
+      Окончание: u.teacherSubscription?.endDate ? new Date(u.teacherSubscription.endDate).toLocaleDateString() : '',
+      Учеников: u._count?.teacherStudents || 0,
+      Курсов: u._count?.teacherCourses || 0,
+      Уроков: u._count?.teacherLessons || 0,
+      'Последний вход': u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString() : '',
+      Создан: new Date(u.createdAt).toLocaleDateString(),
+    }));
+  }
+  function exportSelected() {
+    const rows = rowsForExport();
+    if (rows.length === 0) return;
+    const headers = Object.keys(rows[0]);
+    const csv = '﻿' + [headers, ...rows.map((r: any) => headers.map((h) => r[h]))]
+      .map((r: any[]) => r.map((c) => /[",;\n]/.test(String(c)) ? `"${String(c).replace(/"/g, '""')}"` : String(c)).join(';')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `miz-teachers-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
+  }
+  async function exportXlsx() {
+    const rows = rowsForExport();
+    if (rows.length === 0) return;
+    const xlsx = await import('xlsx');
+    const ws = xlsx.utils.json_to_sheet(rows);
+    const wb = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(wb, ws, 'Teachers');
+    xlsx.writeFile(wb, `miz-teachers-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
   const sortedList = list;
@@ -159,8 +183,18 @@ export function AdminTeachers() {
           <option value="yes">{t('admin.filter.hasCoursesYes')}</option>
           <option value="no">{t('admin.filter.hasCoursesNo')}</option>
         </select>
+        <select className="select" value={subType} onChange={(e) => { setSubType(e.target.value); setOffset(0); }}>
+          <option value="all">{t('admin.fin.typeAny')}</option>
+          <option value="MONTH">{t('teachers.month')}</option>
+          <option value="YEAR">{t('teachers.year')}</option>
+        </select>
+        <input type="date" className="input" style={{ maxWidth: 150 }} placeholder={t('admin.filter.subEndFrom')} title={t('admin.filter.subEndFrom')}
+          value={subEndFrom} onChange={(e) => { setSubEndFrom(e.target.value); setOffset(0); }} />
+        <input type="date" className="input" style={{ maxWidth: 150 }} placeholder={t('admin.filter.subEndTo')} title={t('admin.filter.subEndTo')}
+          value={subEndTo} onChange={(e) => { setSubEndTo(e.target.value); setOffset(0); }} />
         <div className="spacer" />
         <button className="btn" onClick={exportSelected}>⬇ CSV</button>
+        <button className="btn" onClick={exportXlsx}>⬇ XLSX</button>
         <button className="btn" onClick={() => setImportOpen(true)}>⬆ {t('admin.import.import')}</button>
         <button className="btn btn-primary" onClick={() => setCreateOpen(true)}>{t('btn.addTeacher')}</button>
       </div>
@@ -178,6 +212,7 @@ export function AdminTeachers() {
                 <SortHeader field="name" label={t('students.fullName')} sort={sort} onSort={setSort} />
                 <th>{t('profile.login')}</th>
                 <th>{t('teachers.subscription')}</th>
+                <SortHeader field="revenue" label={t('admin.teacher.revenue')} sort={sort} onSort={setSort} />
                 <SortHeader field="students" label={t('admin.teacher.studentsList')} sort={sort} onSort={setSort} />
                 <SortHeader field="courses" label={t('admin.teacher.coursesList')} sort={sort} onSort={setSort} />
                 <SortHeader field="activity" label={t('admin.teacher.lastLogin')} sort={sort} onSort={setSort} />
@@ -200,6 +235,7 @@ export function AdminTeachers() {
                     {tc.teacherSubscription ? <StatusBadge status={tc.teacherSubscription.status} /> : '—'}
                     {tc.teacherSubscription?.endDate && <div className="muted" style={{ fontSize: 11 }}>{t('course.untilDate')} {new Date(tc.teacherSubscription.endDate).toLocaleDateString()}</div>}
                   </td>
+                  <td>{tc.teacherSubscription?.amount ? `${tc.teacherSubscription.amount.toLocaleString()} ${tc.teacherSubscription.currency || '₽'}` : '—'}</td>
                   <td>{tc._count?.teacherStudents || 0}</td>
                   <td>{tc._count?.teacherCourses || 0}</td>
                   <td className="muted" style={{ fontSize: 12 }}>{tc.lastLoginAt ? new Date(tc.lastLoginAt).toLocaleDateString() : '—'}</td>
@@ -214,7 +250,7 @@ export function AdminTeachers() {
                   </td>
                 </tr>
               ))}
-              {sortedList.length === 0 && <tr><td colSpan={9} className="empty">{t('empty.noFound')}</td></tr>}
+              {sortedList.length === 0 && <tr><td colSpan={10} className="empty">{t('empty.noFound')}</td></tr>}
             </tbody>
           </table>
           <Paginator total={total} limit={limit} offset={offset} onChange={setOffset} />
@@ -265,11 +301,71 @@ export function AdminTeachers() {
         onConfirm={bulkArchive}
       />
 
+      {bulkExtendOpen && <BulkExtendModalT teacherIds={Array.from(selected)} onClose={() => setBulkExtendOpen(false)} onSaved={() => { setSelected(new Set()); refetch(); }} />}
+      {bulkStatusOpen && <BulkStatusModalT teacherIds={Array.from(selected)} onClose={() => setBulkStatusOpen(false)} onSaved={() => { setSelected(new Set()); refetch(); }} />}
+
       <BulkBar count={selected.size} onClear={() => setSelected(new Set())}>
+        <button className="btn btn-primary" onClick={() => setBulkExtendOpen(true)}>{t('admin.sub.extend')}</button>
+        <button className="btn" onClick={() => setBulkStatusOpen(true)}>{t('admin.sub.statusChange')}</button>
         <button className="btn btn-danger" onClick={() => setBulkArchiveOpen(true)}>{t('btn.archive')}</button>
         <button className="btn" onClick={exportSelected}>⬇ CSV</button>
+        <button className="btn" onClick={exportXlsx}>⬇ XLSX</button>
       </BulkBar>
     </Shell>
+  );
+}
+
+function BulkExtendModalT({ teacherIds, onClose, onSaved }: { teacherIds: string[]; onClose: () => void; onSaved: () => void }) {
+  const { t } = useT();
+  const [months, setMonths] = useState(1);
+  const [comment, setComment] = useState('');
+  function save() {
+    onClose();
+    api.post('/admin/subscriptions/bulk-extend', { teacherIds, months, comment })
+      .then((r) => { toast.success(`${t('admin.sub.extended')}: ${r.data.count}`); invalidateApi('/admin/teachers'); onSaved(); })
+      .catch(() => toast.error(t('toast.notSaved')));
+  }
+  return (
+    <Modal open onClose={onClose} title={`${t('admin.sub.bulkExtend')}: ${teacherIds.length}`} width={420}
+      footer={<><button className="btn" onClick={onClose}>{t('btn.cancel')}</button><button className="btn btn-primary" onClick={save}>{t('admin.sub.extend')}</button></>}>
+      <div className="field"><label>{t('admin.sub.months')}</label>
+        <select className="select" value={months} onChange={(e) => setMonths(+e.target.value)}>
+          <option value="1">+1 мес.</option>
+          <option value="3">+3 мес.</option>
+          <option value="6">+6 мес.</option>
+          <option value="12">+12 мес.</option>
+        </select>
+      </div>
+      <div className="field"><label>{t('admin.sub.comment')}</label><input className="input" value={comment} onChange={(e) => setComment(e.target.value)} /></div>
+    </Modal>
+  );
+}
+
+function BulkStatusModalT({ teacherIds, onClose, onSaved }: { teacherIds: string[]; onClose: () => void; onSaved: () => void }) {
+  const { t } = useT();
+  const [status, setStatus] = useState('ACTIVE');
+  const [comment, setComment] = useState('');
+  function save() {
+    onClose();
+    api.post('/admin/subscriptions/bulk-status', { teacherIds, status, comment })
+      .then((r) => { toast.success(`${t('teachers.subUpdated')}: ${r.data.count}`); invalidateApi('/admin/teachers'); onSaved(); })
+      .catch(() => toast.error(t('toast.notSaved')));
+  }
+  return (
+    <Modal open onClose={onClose} title={`${t('admin.sub.bulkStatus')}: ${teacherIds.length}`} width={420}
+      footer={<><button className="btn" onClick={onClose}>{t('btn.cancel')}</button><button className="btn btn-primary" onClick={save}>{t('btn.save')}</button></>}>
+      <div className="field"><label>{t('admin.sub.status')}</label>
+        <select className="select" value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="ACTIVE">ACTIVE</option>
+          <option value="EXPIRED">EXPIRED</option>
+          <option value="BLOCKED">BLOCKED</option>
+          <option value="PAUSED">PAUSED</option>
+          <option value="CANCELED">CANCELED</option>
+          <option value="TRIAL">TRIAL</option>
+        </select>
+      </div>
+      <div className="field"><label>{t('admin.sub.comment')}</label><input className="input" value={comment} onChange={(e) => setComment(e.target.value)} /></div>
+    </Modal>
   );
 }
 

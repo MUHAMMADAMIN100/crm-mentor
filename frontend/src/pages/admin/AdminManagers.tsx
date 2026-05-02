@@ -6,35 +6,38 @@ import { Modal } from '../../components/Modal';
 import { SkeletonTable } from '../../components/Skeleton';
 import { toast, confirmDialog } from '../../store';
 import { useT } from '../../i18n';
-import { StatusBadge } from '../../components/AdminUI';
+import { StatusBadge, SortHeader, Paginator } from '../../components/AdminUI';
 
 export function AdminManagers() {
   const { t } = useT();
-  const { data: list, loading, refetch } = useApi<any[]>('/admin/managers');
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState('-created');
+  const [offset, setOffset] = useState(0);
+  const limit = 50;
+  const url = `/admin/managers?${new URLSearchParams({
+    ...(search ? { search } : {}),
+    sort,
+    limit: String(limit),
+    offset: String(offset),
+  }).toString()}`;
+  const { data: response, loading, refetch } = useApi<any>(url);
+  const list: any[] = Array.isArray(response) ? response : response?.items || [];
+  const total: number = response?.total || 0;
   const { data: perms } = useApi<string[]>('/admin/managers/permissions');
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
-  const [search, setSearch] = useState('');
-
-  const filtered = (list || []).filter((m) => {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    return (m.fullName || '').toLowerCase().includes(q)
-      || (m.login || '').toLowerCase().includes(q)
-      || (m.email || '').toLowerCase().includes(q);
-  });
+  // search is server-side now, no further client filtering
+  const filtered = list;
 
   async function archive(id: string) {
     const ok = await confirmDialog({ title: t('admin.managers.confirmArchive'), danger: true, okLabel: t('btn.archive') });
     if (!ok) return;
-    const prev = list || [];
-    mutateCache<any[]>('/admin/managers', undefined, (cur) => (cur || []).filter((x) => x.id !== id));
     try {
       await api.patch(`/admin/users/${id}/archive`);
       invalidateApi('/admin/managers');
+      refetch();
       toast.success(t('teachers.archived'));
     } catch {
-      mutateCache<any[]>('/admin/managers', undefined, () => prev);
       toast.error(t('toast.error'));
     }
   }
@@ -47,16 +50,16 @@ export function AdminManagers() {
         <button className="btn btn-primary" onClick={() => { setEditing(null); setOpen(true); }}>{t('admin.managers.create')}</button>
       </div>
 
-      {loading && !list ? <SkeletonTable rows={5} cols={6} /> : (
+      {loading && !response ? <SkeletonTable rows={5} cols={6} /> : (
         <div className="card" style={{ padding: 0 }}>
           <table className="table">
             <thead>
               <tr>
-                <th>{t('profile.fullName')}</th>
+                <SortHeader field="name" label={t('profile.fullName')} sort={sort} onSort={(v) => { setSort(v); setOffset(0); }} />
                 <th>{t('profile.login')}</th>
-                <th>{t('admin.managers.role')}</th>
+                <SortHeader field="role" label={t('admin.managers.role')} sort={sort} onSort={(v) => { setSort(v); setOffset(0); }} />
                 <th>{t('admin.managers.permissions')}</th>
-                <th>{t('admin.teacher.lastLogin')}</th>
+                <SortHeader field="activity" label={t('admin.teacher.lastLogin')} sort={sort} onSort={(v) => { setSort(v); setOffset(0); }} />
                 <th></th>
               </tr>
             </thead>
@@ -65,6 +68,7 @@ export function AdminManagers() {
               {filtered.length === 0 && <tr><td colSpan={6} className="empty">{t('admin.managers.empty')}</td></tr>}
             </tbody>
           </table>
+          <Paginator total={total} limit={limit} offset={offset} onChange={setOffset} />
         </div>
       )}
 
